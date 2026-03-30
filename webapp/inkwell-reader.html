@@ -1667,11 +1667,49 @@ window.addEventListener('load', async () => {
   applySettings();
   await loadBooksFromIndexedDB();
 
-  setTimeout(() => {
+  setTimeout(async () => {
     const ls = document.getElementById('loadingScreen');
     ls.classList.add('hidden');
     setTimeout(() => ls.remove(), 500);
-    showScreen('screen-login');
+
+    // Auto-login se vindo da landing page
+    const pending = localStorage.getItem('inkwell_pending_session');
+    if (pending) {
+      localStorage.removeItem('inkwell_pending_session');
+      try {
+        const { email, pass } = JSON.parse(pending);
+        // Tenta Supabase primeiro
+        let loggedIn = false;
+        try {
+          const { data, error } = await sb.from('inkwell_users')
+            .select('*').eq('email', email).eq('password', pass).maybeSingle();
+          if (!error && data && data.status === 'active') {
+            APP.currentUser = data;
+            await syncBooksFromCloud();
+            await loadProgressFromCloud();
+            document.getElementById('adminBtn').style.display = data.role === 'admin' ? '' : 'none';
+            renderLibrary();
+            einkFlash(() => showScreen('screen-library'));
+            loggedIn = true;
+          }
+        } catch(_) {}
+        // Fallback offline
+        if (!loggedIn) {
+          const users = JSON.parse(localStorage.getItem('inkwell_users') || '[]');
+          const user = users.find(u => u.email === email && u.password === pass && u.status !== 'blocked');
+          if (user) {
+            APP.currentUser = user;
+            document.getElementById('adminBtn').style.display = user.role === 'admin' ? '' : 'none';
+            renderLibrary();
+            einkFlash(() => showScreen('screen-library'));
+            loggedIn = true;
+          }
+        }
+        if (!loggedIn) showScreen('screen-login');
+      } catch(_) { showScreen('screen-login'); }
+    } else {
+      showScreen('screen-login');
+    }
   }, 2200);
 });
 
