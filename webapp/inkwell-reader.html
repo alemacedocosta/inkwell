@@ -1542,9 +1542,17 @@ input[type="file"] { display: none; }
 <!-- Hidden file input -->
 <input type="file" id="epubFileInput" accept=".epub" multiple>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <script>
+// ============================================================
+// SUPABASE
+// ============================================================
+const SUPABASE_URL = 'https://xuhcvqpmwigeuqmfyqjj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh1aGN2cXBtd2lnZXVxbWZ5cWpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NjQ5NjUsImV4cCI6MjA5MDQ0MDk2NX0.odkc-I4Iwv9Qs2Cs8rvqYO6sJg7FQTor3XuR44XGxPk';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 // ============================================================
 // STATE
 // ============================================================
@@ -1572,17 +1580,15 @@ let APP = {
 // ============================================================
 // STORAGE HELPERS
 // ============================================================
-function saveState() {
+function saveState(bookId) {
   try {
-    localStorage.setItem('inkwell_books_meta', JSON.stringify(
-      APP.books.map(b => ({
-        id: b.id, title: b.title, author: b.author,
-        cover: b.cover, currentPage: b.currentPage,
-        totalPages: b.totalPages, timePerPage: b.timePerPage
-      }))
-    ));
     localStorage.setItem('inkwell_settings', JSON.stringify(APP.settings));
     localStorage.setItem('inkwell_reading_stats', JSON.stringify(APP.readingStats));
+    // Sync reading progress to cloud for current book
+    if (bookId && APP.currentUser) {
+      const book = APP.books.find(b => b.id === bookId);
+      if (book) syncProgressToCloud(bookId, book.currentPage, book.totalPages);
+    }
   } catch(e) {}
 }
 
@@ -1595,40 +1601,48 @@ function loadState() {
   } catch(e) {}
 }
 
-function getUsers() {
-  try { return JSON.parse(localStorage.getItem('inkwell_users') || '[]'); }
-  catch(e) { return []; }
+async function getUsers() {
+  try {
+    const { data, error } = await sb.from('inkwell_users').select('*').order('created_at');
+    if (error) throw error;
+    return data || [];
+  } catch(e) {
+    // fallback to localStorage during offline
+    try { return JSON.parse(localStorage.getItem('inkwell_users') || '[]'); } catch(_) { return []; }
+  }
 }
 
-function saveUsers(users) {
-  localStorage.setItem('inkwell_users', JSON.stringify(users));
-}
-
-function initDefaultAdmin() {
-  let users = getUsers();
-  if (!users.find(u => u.role === 'admin')) {
-    users.push({
-      id: 'admin_1',
-      email: 'admin@inkwell.com',
-      password: 'admin123',
-      role: 'admin',
-      status: 'active',
-      created: new Date().toISOString()
-    });
-    saveUsers(users);
+async function initDefaultAdmin() {
+  try {
+    const { data } = await sb.from('inkwell_users').select('id').eq('email', 'admin@inkwell.com').maybeSingle();
+    if (!data) {
+      await sb.from('inkwell_users').insert({
+        id: 'admin_1',
+        email: 'admin@inkwell.com',
+        password: 'admin123',
+        role: 'admin',
+        status: 'active'
+      });
+    }
+  } catch(e) {
+    // offline fallback
+    let users = [];
+    try { users = JSON.parse(localStorage.getItem('inkwell_users') || '[]'); } catch(_) {}
+    if (!users.find(u => u.role === 'admin')) {
+      users.push({ id: 'admin_1', email: 'admin@inkwell.com', password: 'admin123', role: 'admin', status: 'active', created: new Date().toISOString() });
+      localStorage.setItem('inkwell_users', JSON.stringify(users));
+    }
   }
 }
 
 // ============================================================
 // STARTUP
 // ============================================================
-window.addEventListener('load', () => {
-  initDefaultAdmin();
+window.addEventListener('load', async () => {
+  await initDefaultAdmin();
   loadState();
   applySettings();
-
-  // Load book metadata (not actual content — that's in IndexedDB)
-  loadBooksFromIndexedDB();
+  await loadBooksFromIndexedDB();
 
   setTimeout(() => {
     const ls = document.getElementById('loadingScreen');
@@ -1714,27 +1728,106 @@ async function loadBooksFromIndexedDB() {
 }
 
 // ============================================================
+// CLOUD SYNC
+// ============================================================
+async function syncBooksFromCloud() {
+  if (!APP.currentUser) return;
+  try {
+    showNotification('Sincronizando biblioteca...');
+    const { data: cloudBooks, error } = await sb.from('books')
+      .select('*').eq('added_by', APP.currentUser.email);
+    if (error || !cloudBooks?.length) return;
+
+    const localIds = new Set(APP.books.map(b => b.id));
+    const toDownload = cloudBooks.filter(b => !localIds.has(b.id));
+
+    for (const cb of toDownload) {
+      try {
+        showNotification(`Baixando: ${cb.title}...`);
+        const { data: fileData, error: dlErr } = await sb.storage.from('epubs').download(cb.file_path);
+        if (dlErr) continue;
+        const file = new File([fileData], `${cb.id}.epub`, { type: 'application/epub+zip' });
+        // Parse without re-uploading
+        const _origUser = APP.currentUser;
+        APP.currentUser = null; // prevent re-upload loop
+        await processEpubFile(file, cb.id);
+        APP.currentUser = _origUser;
+      } catch(e) { console.warn('Book download failed:', cb.title, e); }
+    }
+    if (toDownload.length > 0) showNotification(`${toDownload.length} livro(s) sincronizado(s)!`);
+  } catch(e) { console.warn('Cloud sync failed:', e); }
+}
+
+async function syncProgressToCloud(bookId, currentPage, totalPages) {
+  if (!APP.currentUser) return;
+  try {
+    await sb.from('reading_progress').upsert({
+      user_email: APP.currentUser.email,
+      book_id: bookId,
+      current_page: currentPage,
+      total_pages: totalPages,
+      last_read: new Date().toISOString()
+    }, { onConflict: 'user_email,book_id' });
+  } catch(e) { /* silent fail */ }
+}
+
+async function loadProgressFromCloud() {
+  if (!APP.currentUser) return;
+  try {
+    const { data, error } = await sb.from('reading_progress')
+      .select('*').eq('user_email', APP.currentUser.email);
+    if (error || !data) return;
+    data.forEach(row => {
+      const book = APP.books.find(b => b.id === row.book_id);
+      if (book) {
+        book.currentPage = row.current_page || 0;
+        book.totalPages = row.total_pages || book.totalPages;
+      }
+    });
+  } catch(e) { /* silent fail */ }
+}
+
+// ============================================================
 // AUTH
 // ============================================================
-function doLogin() {
+async function doLogin() {
   const email = document.getElementById('loginEmail').value.trim();
   const pass = document.getElementById('loginPassword').value;
   const errEl = document.getElementById('loginError');
 
   if (!email || !pass) { errEl.textContent = 'Preencha todos os campos.'; return; }
+  errEl.textContent = 'Verificando...';
 
-  const users = getUsers();
-  const user = users.find(u => u.email === email && u.password === pass);
+  try {
+    const { data, error } = await sb.from('inkwell_users')
+      .select('*').eq('email', email).eq('password', pass).maybeSingle();
+    if (error) throw error;
 
-  if (!user) { errEl.textContent = 'E-mail ou senha incorretos.'; return; }
-  if (user.status === 'blocked') { errEl.textContent = 'Conta bloqueada. Contate o administrador.'; return; }
-  if (user.status === 'pending') { errEl.textContent = 'Conta aguardando aprovação.'; return; }
+    if (!data) { errEl.textContent = 'E-mail ou senha incorretos.'; return; }
+    if (data.status === 'blocked') { errEl.textContent = 'Conta bloqueada. Contate o administrador.'; return; }
+    if (data.status === 'pending') { errEl.textContent = 'Conta aguardando aprovação.'; return; }
 
-  APP.currentUser = user;
-  errEl.textContent = '';
-  einkFlash(() => showScreen('screen-library'));
-  document.getElementById('adminBtn').style.display = user.role === 'admin' ? '' : 'none';
-  renderLibrary();
+    APP.currentUser = data;
+    errEl.textContent = '';
+    await syncBooksFromCloud();
+    await loadProgressFromCloud();
+    einkFlash(() => showScreen('screen-library'));
+    document.getElementById('adminBtn').style.display = data.role === 'admin' ? '' : 'none';
+    renderLibrary();
+  } catch(e) {
+    // offline fallback
+    try {
+      const users = JSON.parse(localStorage.getItem('inkwell_users') || '[]');
+      const user = users.find(u => u.email === email && u.password === pass);
+      if (!user) { errEl.textContent = 'E-mail ou senha incorretos.'; return; }
+      if (user.status === 'blocked') { errEl.textContent = 'Conta bloqueada.'; return; }
+      APP.currentUser = user;
+      errEl.textContent = '';
+      einkFlash(() => showScreen('screen-library'));
+      document.getElementById('adminBtn').style.display = user.role === 'admin' ? '' : 'none';
+      renderLibrary();
+    } catch(_) { errEl.textContent = 'Erro de conexão. Tente novamente.'; }
+  }
 }
 
 function doLogout() {
@@ -1755,7 +1848,7 @@ function closeRegisterModal() {
   document.getElementById('registerModal').classList.remove('open');
 }
 
-function doRegister() {
+async function doRegister() {
   const email = document.getElementById('regEmail').value.trim();
   const pass = document.getElementById('regPassword').value;
 
@@ -1764,22 +1857,22 @@ function doRegister() {
     return;
   }
 
-  let users = getUsers();
-  if (users.find(u => u.email === email)) {
-    showNotification('E-mail já cadastrado');
-    return;
-  }
+  try {
+    const { data: existing } = await sb.from('inkwell_users').select('id').eq('email', email).maybeSingle();
+    if (existing) { showNotification('E-mail já cadastrado'); return; }
 
-  users.push({
-    id: 'u_' + Date.now(),
-    email, password: pass,
-    role: 'user',
-    status: 'pending',
-    created: new Date().toISOString()
-  });
-  saveUsers(users);
-  closeRegisterModal();
-  showNotification('Conta criada! Aguarde aprovação.');
+    const { error } = await sb.from('inkwell_users').insert({
+      id: 'u_' + Date.now(),
+      email, password: pass,
+      role: 'user',
+      status: 'pending'
+    });
+    if (error) throw error;
+    closeRegisterModal();
+    showNotification('Conta criada! Aguarde aprovação.');
+  } catch(e) {
+    showNotification('Erro ao criar conta. Tente novamente.');
+  }
 }
 
 // ============================================================
@@ -1986,7 +2079,7 @@ document.getElementById('epubFileInput').addEventListener('change', async (e) =>
 // ============================================================
 // EPUB PARSER
 // ============================================================
-async function processEpubFile(file) {
+async function processEpubFile(file, forceBookId) {
   try {
     const zip = await JSZip.loadAsync(file);
 
@@ -2108,7 +2201,7 @@ async function processEpubFile(file) {
       entry.spineIndex = idx >= 0 ? idx : 0;
     });
 
-    const bookId = 'book_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
+    const bookId = forceBookId || ('book_' + Date.now() + '_' + Math.random().toString(36).substr(2,5));
 
     const bookData = {
       id: bookId,
@@ -2125,6 +2218,26 @@ async function processEpubFile(file) {
     };
 
     await saveBookToDB(bookData);
+
+    // Upload raw EPUB to Supabase Storage for cross-device sync (only on original upload, not during sync download)
+    try {
+      const userEmail = APP.currentUser?.email;
+      if (!userEmail || forceBookId) throw new Error('skip upload');
+      const filePath = `${userEmail}/${bookId}.epub`;
+      const arrayBuf = await file.arrayBuffer();
+      const { error: uploadErr } = await sb.storage.from('epubs').upload(filePath, arrayBuf, { contentType: 'application/epub+zip', upsert: true });
+      if (!uploadErr) {
+        await sb.from('books').upsert({
+          id: bookId,
+          title,
+          author: creator,
+          cover_url: coverDataUrl,
+          file_path: filePath,
+          file_size: file.size,
+          added_by: userEmail
+        });
+      }
+    } catch(cloudErr) { console.warn('Cloud upload skipped:', cloudErr); }
 
     APP.books.unshift({
       id: bookId,
@@ -2492,7 +2605,7 @@ function saveBookProgress() {
     book.timePerPage = APP.currentBook.timePerPage;
     saveBookToDB(book);
   }
-  saveState();
+  saveState(APP.currentBook.id);
   renderLibrary();
 }
 
@@ -2661,10 +2774,11 @@ function switchAdminTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
 }
 
-function renderAdminUsers() {
+async function renderAdminUsers() {
   const tbody = document.getElementById('usersTableBody');
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;font-size:10px;color:var(--ink-faint)">Carregando...</td></tr>';
+  const users = await getUsers();
   tbody.innerHTML = '';
-  const users = getUsers();
 
   users.forEach(u => {
     const tr = document.createElement('tr');
@@ -2691,71 +2805,55 @@ function statusLabel(s) {
   return { active: 'Ativo', blocked: 'Bloqueado', pending: 'Pendente' }[s] || s;
 }
 
-function approveUser(id) {
-  let users = getUsers();
-  users = users.map(u => u.id === id ? { ...u, status: 'active' } : u);
-  saveUsers(users);
+async function approveUser(id) {
+  await sb.from('inkwell_users').update({ status: 'active' }).eq('id', id);
   renderAdminUsers();
   showNotification('Usuário aprovado');
 }
 
-function blockUser(id) {
-  let users = getUsers();
-  users = users.map(u => u.id === id ? { ...u, status: 'blocked' } : u);
-  saveUsers(users);
+async function blockUser(id) {
+  await sb.from('inkwell_users').update({ status: 'blocked' }).eq('id', id);
   renderAdminUsers();
   showNotification('Usuário bloqueado');
 }
 
-function unblockUser(id) {
-  let users = getUsers();
-  users = users.map(u => u.id === id ? { ...u, status: 'active' } : u);
-  saveUsers(users);
+async function unblockUser(id) {
+  await sb.from('inkwell_users').update({ status: 'active' }).eq('id', id);
   renderAdminUsers();
   showNotification('Usuário desbloqueado');
 }
 
-function deleteUser(id) {
-  confirm2('Deletar Usuário', 'Esta ação não pode ser desfeita.', () => {
-    let users = getUsers().filter(u => u.id !== id);
-    saveUsers(users);
+async function deleteUser(id) {
+  confirm2('Deletar Usuário', 'Esta ação não pode ser desfeita.', async () => {
+    await sb.from('inkwell_users').delete().eq('id', id);
     renderAdminUsers();
     showNotification('Usuário removido');
   });
 }
 
-function createUser() {
+async function createUser() {
   const email = document.getElementById('newUserEmail').value.trim();
   const pass = document.getElementById('newUserPassword').value;
   const role = document.getElementById('newUserRole').value;
 
-  if (!email || pass.length < 6) {
-    showNotification('Preencha e-mail e senha (mín. 6)');
-    return;
-  }
+  if (!email || pass.length < 6) { showNotification('Preencha e-mail e senha (mín. 6)'); return; }
 
-  let users = getUsers();
-  if (users.find(u => u.email === email)) {
-    showNotification('E-mail já existe');
-    return;
-  }
+  const { data: existing } = await sb.from('inkwell_users').select('id').eq('email', email).maybeSingle();
+  if (existing) { showNotification('E-mail já existe'); return; }
 
-  users.push({
-    id: 'u_' + Date.now(),
-    email, password: pass, role,
-    status: 'active',
-    created: new Date().toISOString()
+  const { error } = await sb.from('inkwell_users').insert({
+    id: 'u_' + Date.now(), email, password: pass, role, status: 'active'
   });
-  saveUsers(users);
+  if (error) { showNotification('Erro ao criar usuário'); return; }
+
   document.getElementById('newUserEmail').value = '';
   document.getElementById('newUserPassword').value = '';
   renderAdminUsers();
   showNotification('Usuário criado');
 }
 
-function openEditUser(id) {
-  const users = getUsers();
-  const u = users.find(u => u.id === id);
+async function openEditUser(id) {
+  const { data: u } = await sb.from('inkwell_users').select('*').eq('id', id).maybeSingle();
   if (!u) return;
   document.getElementById('editUserId').value = id;
   document.getElementById('editUserEmail').value = u.email;
@@ -2772,7 +2870,7 @@ function closeEditUserOutside(e) {
   if (e.target === document.getElementById('editUserOverlay')) closeEditUser();
 }
 
-function saveEditUser() {
+async function saveEditUser() {
   const id    = document.getElementById('editUserId').value;
   const email = document.getElementById('editUserEmail').value.trim();
   const pass  = document.getElementById('editUserPassword').value;
@@ -2781,22 +2879,19 @@ function saveEditUser() {
   if (!email) { showNotification('E-mail não pode ser vazio'); return; }
   if (pass && pass.length < 6) { showNotification('Senha deve ter mínimo 6 caracteres'); return; }
 
-  let users = getUsers();
-  const conflict = users.find(u => u.email === email && u.id !== id);
+  const { data: conflict } = await sb.from('inkwell_users').select('id').eq('email', email).neq('id', id).maybeSingle();
   if (conflict) { showNotification('Este e-mail já está em uso'); return; }
 
-  users = users.map(u => {
-    if (u.id !== id) return u;
-    return { ...u, email, role, ...(pass ? { password: pass } : {}) };
-  });
-  saveUsers(users);
+  const updates = { email, role };
+  if (pass) updates.password = pass;
+  await sb.from('inkwell_users').update(updates).eq('id', id);
   closeEditUser();
   renderAdminUsers();
   showNotification('Usuário atualizado');
 }
 
-function renderAdminStats() {
-  const users = getUsers();
+async function renderAdminStats() {
+  const users = await getUsers();
   const grid = document.getElementById('statsGrid');
   grid.innerHTML = `
     <div class="stat-card">
