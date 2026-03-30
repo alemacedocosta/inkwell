@@ -434,20 +434,29 @@ body::before {
   flex-direction: column;
   background: var(--paper);
   overflow: hidden;
+  position: relative;
 }
 
 .reader-header {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 200;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 20px;
   border-bottom: 1px solid var(--paper-dark);
-  flex-shrink: 0;
+  background: var(--paper);
+  transform: translateY(0);
   opacity: 1;
-  transition: var(--transition-eink-slow);
+  transition: transform 0.3s steps(6, end), opacity 0.3s steps(6, end);
 }
 
-.reader-header.hidden { opacity: 0; pointer-events: none; }
+.reader-header.hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
 
 .reader-back {
   font-size: 10px;
@@ -479,8 +488,8 @@ body::before {
 .reader-header-actions { display: flex; gap: 8px; }
 
 .reader-body {
-  flex: 1;
-  position: relative;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
 }
 
@@ -548,15 +557,27 @@ body::before {
 }
 
 .reader-footer {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  z-index: 200;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 8px 20px;
   border-top: 1px solid var(--paper-dark);
-  flex-shrink: 0;
+  background: var(--paper);
   font-size: 9px;
   letter-spacing: 0.1em;
   color: var(--ink-faint);
+  transform: translateY(0);
+  opacity: 1;
+  transition: transform 0.3s steps(6, end), opacity 0.3s steps(6, end);
+}
+
+.reader-footer.hidden {
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .reader-page-number { font-family: var(--font-ui); }
@@ -566,21 +587,21 @@ body::before {
 /* Touch zones */
 .touch-zone {
   position: absolute;
-  top: 0; bottom: 0;
-  width: 25%;
   z-index: 100;
   cursor: pointer;
 }
 
-.touch-zone-left { left: 0; }
-.touch-zone-right { right: 0; }
-.touch-zone-center {
-  left: 25%; right: 25%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Top strip — shows/hides the header */
+.touch-zone-top {
+  top: 0; left: 0; right: 0;
+  height: 15%;
+  z-index: 101; /* above left/right zones */
   cursor: default;
 }
+
+/* Left/right nav zones start below the top strip */
+.touch-zone-left  { top: 15%; bottom: 0; left: 0;  width: 25%; }
+.touch-zone-right { top: 15%; bottom: 0; right: 0; width: 25%; }
 
 /* Page turn animation */
 @keyframes pageFlipRight {
@@ -1013,9 +1034,11 @@ body::before {
 
 /* === PROGRESS BAR === */
 .reader-progress {
+  position: absolute;
+  top: 0; left: 0; right: 0;
   height: 2px;
   background: var(--paper-dark);
-  flex-shrink: 0;
+  z-index: 199;
 }
 
 .reader-progress-fill {
@@ -1293,9 +1316,9 @@ input[type="file"] { display: none; }
       </div>
 
       <!-- Touch zones -->
+      <div class="touch-zone touch-zone-top" onclick="toggleReaderUI()"></div>
       <div class="touch-zone touch-zone-left" onclick="prevPage()"></div>
       <div class="touch-zone touch-zone-right" onclick="nextPage()"></div>
-      <div class="touch-zone touch-zone-center" onclick="toggleReaderUI()"></div>
     </div>
 
     <div class="reader-footer" id="readerFooter">
@@ -1739,7 +1762,11 @@ async function syncBooksFromCloud() {
     if (error || !cloudBooks?.length) return;
 
     const localIds = new Set(APP.books.map(b => b.id));
-    const toDownload = cloudBooks.filter(b => !localIds.has(b.id));
+    const localTitles = new Set(APP.books.map(b => (b.title + '|' + b.author).toLowerCase()));
+    const toDownload = cloudBooks.filter(b =>
+      !localIds.has(b.id) &&
+      !localTitles.has((b.title + '|' + b.author).toLowerCase())
+    );
 
     for (const cb of toDownload) {
       try {
@@ -1947,11 +1974,18 @@ function closeSettingsOutside(e) {
   if (e.target === document.getElementById('settingsOverlay')) closeSettings();
 }
 
+let _repaginateTimer = null;
+function debouncedRepaginate() {
+  clearTimeout(_repaginateTimer);
+  _repaginateTimer = setTimeout(() => repaginateCurrentBook(), 400);
+}
+
 function adjustFont(delta) {
   APP.settings.fontSize = Math.min(32, Math.max(12, APP.settings.fontSize + delta));
   document.getElementById('fontSizeVal').textContent = APP.settings.fontSize;
   applyReaderStyles();
   saveState();
+  debouncedRepaginate();
 }
 
 function adjustSpacing(delta) {
@@ -1959,12 +1993,14 @@ function adjustSpacing(delta) {
   document.getElementById('spacingVal').textContent = APP.settings.lineSpacing.toFixed(1);
   applyReaderStyles();
   saveState();
+  debouncedRepaginate();
 }
 
 function changeFont(val) {
   APP.settings.fontFamily = val;
   applyReaderStyles();
   saveState();
+  debouncedRepaginate();
 }
 
 function setScrollMode(mode) {
@@ -2363,6 +2399,7 @@ async function openBook(bookId) {
 
   einkFlash(() => {
     showScreen('screen-reader');
+    hideReaderHeader(); // header always starts hidden — tap top to reveal
     document.getElementById('readerTitleHeader').textContent = book.title;
     renderTOC(book);
     applyReaderStyles();
@@ -2412,11 +2449,9 @@ function paginateBook(book) {
 }
 
 function getAvailablePageHeight() {
-  const header = document.querySelector('#screen-reader .reader-header');
-  const footer = document.querySelector('#screen-reader .reader-footer');
-  const headerH = header ? header.offsetHeight : 44;
-  const footerH = footer ? footer.offsetHeight : 36;
-  return window.innerHeight - headerH - footerH;
+  // Header and footer are absolute overlays — body fills full screen height.
+  const body = document.getElementById('readerBody');
+  return body ? body.offsetHeight : window.innerHeight;
 }
 
 function splitIntoPages(html) {
@@ -2435,6 +2470,10 @@ function splitIntoPages(html) {
   // IMPORTANT: must include class "reader-page-content" so CSS rules like
   // "p { margin-bottom: 1em }" are applied — otherwise paragraphs measure
   // shorter than they actually render, causing page overflow.
+  // 4px buffer for sub-pixel rendering differences — small enough to be
+  // invisible but enough to prevent the very last line from overflowing.
+  const safePageHeight = pageHeight - 4;
+
   const measurer = document.createElement('div');
   measurer.className = 'reader-page-content';
   measurer.style.cssText = [
@@ -2444,15 +2483,15 @@ function splitIntoPages(html) {
     `width:${contentWidth}px`,
     `font-size:${s.fontSize}px`,
     `font-family:${s.fontFamily}`,
-    'line-height:1.8',
+    `line-height:${s.lineSpacing}`,   /* must match actual reader line-height */
     `padding:${s.marginTop}px ${s.marginRight}px ${s.marginBottom}px ${s.marginLeft}px`,
     'box-sizing:border-box',
     'visibility:hidden',
     'pointer-events:none',
     'z-index:-1',
     'overflow:hidden',
-    'flex:none',    /* override flex:1 from .reader-page-content */
-    'max-width:none' /* override max-width media query so width is honored */
+    'flex:none',
+    'max-width:none'
   ].join(';');
   document.body.appendChild(measurer);
 
@@ -2468,7 +2507,7 @@ function splitIntoPages(html) {
     const testHtml = currentHtml + nodeHtml;
     measurer.innerHTML = testHtml;
 
-    if (measurer.offsetHeight > pageHeight && currentHtml.trim()) {
+    if (measurer.offsetHeight > safePageHeight && currentHtml.trim()) {
       // Current accumulation fills a page — save it, start fresh with this node
       pages.push(currentHtml);
       currentHtml = nodeHtml;
@@ -2641,10 +2680,28 @@ function updateReaderFooter() {
   }
 }
 
+let _headerHideTimer = null;
+
+function showReaderHeader() {
+  APP.readerUIVisible = true;
+  document.getElementById('readerHeader').classList.remove('hidden');
+  document.getElementById('readerFooter').classList.remove('hidden');
+  clearTimeout(_headerHideTimer);
+  _headerHideTimer = setTimeout(hideReaderHeader, 3000);
+}
+
+function hideReaderHeader() {
+  APP.readerUIVisible = false;
+  document.getElementById('readerHeader').classList.add('hidden');
+  document.getElementById('readerFooter').classList.add('hidden');
+}
+
 function toggleReaderUI() {
-  APP.readerUIVisible = !APP.readerUIVisible;
-  document.getElementById('readerHeader').classList.toggle('hidden', !APP.readerUIVisible);
-  document.getElementById('readerFooter').classList.toggle('hidden', !APP.readerUIVisible);
+  if (APP.readerUIVisible) {
+    hideReaderHeader();
+  } else {
+    showReaderHeader();
+  }
 }
 
 function closeReader() {
@@ -2793,7 +2850,7 @@ async function renderAdminUsers() {
             <button class="btn-small" onclick="openEditUser('${u.id}')">Editar</button>
             ${u.status !== 'blocked' ? `<button class="btn-small" onclick="blockUser('${u.id}')">Bloquear</button>` : `<button class="btn-small" onclick="unblockUser('${u.id}')">Desbloquear</button>`}
             <button class="btn-small danger" onclick="deleteUser('${u.id}')">✕</button>
-          ` : '<span style="font-size:9px;color:var(--ink-faint)">Protegido</span>'}
+          ` : `<button class="btn-small" onclick="openEditUser('${u.id}')">Senha</button>`}
         </div>
       </td>
     `;
