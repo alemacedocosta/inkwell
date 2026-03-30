@@ -1,0 +1,2949 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#f5f0e8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Inkwell — Leitor de E-books</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,600;1,400&family=Merriweather:ital,wght@0,300;0,400;1,300&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=PT+Serif:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,wght@0,300;0,400;1,300&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --ink: #1a1a18;
+  --paper: #f5f0e8;
+  --paper-mid: #e8e2d4;
+  --paper-dark: #d4cdbf;
+  --ink-light: #4a4a44;
+  --ink-faint: #8a8a7a;
+  --accent: #1a1a18;
+
+  --font-body: 'EB Garamond', serif;
+  --font-ui: 'Space Mono', monospace;
+
+  --radius: 2px;
+  --transition-eink: all 0.15s steps(3, end);
+  --transition-eink-slow: all 0.4s steps(8, end);
+  --shadow-page: 4px 4px 0px rgba(0,0,0,0.15), 8px 8px 0px rgba(0,0,0,0.07);
+}
+
+[data-theme="dark"] {
+  --ink: #e8e4dc;
+  --paper: #141410;
+  --paper-mid: #1e1e1a;
+  --paper-dark: #2a2a24;
+  --ink-light: #b8b4ac;
+  --ink-faint: #6a6a60;
+  --accent: #e8e4dc;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: var(--font-ui);
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+  overflow: hidden;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  transition: var(--transition-eink-slow);
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='none'/%3E%3Crect x='0' y='0' width='1' height='1' fill='rgba(0,0,0,0.03)'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.5;
+}
+
+/* === SCREEN SYSTEM === */
+.screen { display: none; width: 100vw; height: 100vh; overflow: hidden; position: absolute; inset: 0; }
+.screen.active { display: flex; }
+
+/* === E-INK FLASH === */
+.eink-flash {
+  position: fixed; inset: 0; background: var(--ink);
+  z-index: 9000; opacity: 0; pointer-events: none;
+  transition: opacity 0.06s steps(2, end);
+}
+.eink-flash.flash { opacity: 1; }
+
+/* === LOGIN === */
+#screen-login {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper);
+}
+
+.login-container {
+  width: 100%;
+  max-width: 380px;
+  padding: 48px 40px;
+  border: 1px solid var(--ink);
+  position: relative;
+}
+
+.login-container::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid var(--ink);
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+.login-logo {
+  font-family: 'EB Garamond', serif;
+  font-size: 42px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin-bottom: 4px;
+  font-style: italic;
+}
+
+.login-tagline {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 40px;
+  padding-bottom: 40px;
+  border-bottom: 1px solid var(--paper-dark);
+}
+
+.field-group { margin-bottom: 20px; }
+
+.field-label {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+
+.field-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ink);
+  padding: 8px 0;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--ink);
+  outline: none;
+  transition: var(--transition-eink);
+}
+
+.field-input:focus { border-bottom-width: 2px; }
+
+.btn-primary {
+  width: 100%;
+  padding: 14px;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-top: 32px;
+  transition: var(--transition-eink);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary:active { opacity: 0.7; }
+
+.login-price {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--paper-dark);
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+}
+
+.login-price strong {
+  display: block;
+  font-family: 'EB Garamond', serif;
+  font-size: 22px;
+  color: var(--ink);
+  letter-spacing: 0;
+  margin: 4px 0;
+}
+
+.login-error {
+  font-size: 10px;
+  color: var(--ink);
+  text-align: center;
+  margin-top: 12px;
+  min-height: 16px;
+  letter-spacing: 0.05em;
+}
+
+.login-register-link {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 10px;
+  color: var(--ink-faint);
+  cursor: pointer;
+  text-decoration: underline;
+  letter-spacing: 0.05em;
+}
+
+/* === LIBRARY === */
+#screen-library {
+  flex-direction: column;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.library-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--ink);
+  flex-shrink: 0;
+}
+
+.library-logo {
+  font-family: 'EB Garamond', serif;
+  font-size: 28px;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.header-actions { display: flex; align-items: center; gap: 16px; }
+
+.icon-btn {
+  width: 36px; height: 36px;
+  border: 1px solid var(--ink);
+  background: transparent;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  transition: var(--transition-eink);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+.icon-btn:active { background: var(--ink); color: var(--paper); }
+
+.library-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.library-section-title {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.library-section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--paper-dark);
+}
+
+.books-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+@media (min-width: 600px) {
+  .books-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}
+
+.book-card {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.book-cover-wrap {
+  position: relative;
+  aspect-ratio: 2/3;
+  border: 1px solid var(--ink);
+  overflow: hidden;
+  box-shadow: var(--shadow-page);
+  background: var(--paper-mid);
+  transition: var(--transition-eink);
+}
+
+.book-card:active .book-cover-wrap {
+  box-shadow: 1px 1px 0 rgba(0,0,0,0.15);
+  transform: translate(3px, 3px);
+}
+
+.book-cover-wrap img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: grayscale(100%);
+}
+
+.book-cover-placeholder {
+  width: 100%; height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--paper-mid);
+  text-align: center;
+  gap: 8px;
+}
+
+.placeholder-spine {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 8px;
+  background: var(--ink);
+  opacity: 0.15;
+}
+
+.placeholder-title {
+  font-family: 'EB Garamond', serif;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--ink);
+  font-style: italic;
+}
+
+.placeholder-author {
+  font-size: 9px;
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+}
+
+.book-progress-bar {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--paper-dark);
+}
+
+.book-progress-fill {
+  height: 100%;
+  background: var(--ink);
+  transition: var(--transition-eink-slow);
+}
+
+.book-info { padding: 0 2px; }
+
+.book-title-label {
+  font-family: 'EB Garamond', serif;
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.book-author-label {
+  font-size: 9px;
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.add-book-card {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+
+.add-book-area {
+  aspect-ratio: 2/3;
+  border: 1px dashed var(--ink-faint);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: var(--transition-eink);
+}
+
+.add-book-area:active { background: var(--paper-mid); }
+
+.add-icon { font-size: 28px; color: var(--ink-faint); }
+
+.add-label {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+.empty-library {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  text-align: center;
+  gap: 16px;
+  grid-column: 1/-1;
+}
+
+.empty-icon { font-size: 48px; color: var(--ink-faint); }
+
+.empty-text {
+  font-family: 'EB Garamond', serif;
+  font-size: 20px;
+  font-style: italic;
+  color: var(--ink-light);
+}
+
+.empty-sub { font-size: 10px; color: var(--ink-faint); letter-spacing: 0.05em; }
+
+/* === READER === */
+#screen-reader {
+  flex-direction: column;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.reader-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--paper-dark);
+  flex-shrink: 0;
+  opacity: 1;
+  transition: var(--transition-eink-slow);
+}
+
+.reader-header.hidden { opacity: 0; pointer-events: none; }
+
+.reader-back {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: var(--font-ui);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reader-title-header {
+  font-family: 'EB Garamond', serif;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--ink-light);
+  text-align: center;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 12px;
+}
+
+.reader-header-actions { display: flex; gap: 8px; }
+
+.reader-body {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.reader-pages-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.reader-page {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.reader-page-content {
+  flex: 1;
+  overflow: hidden;
+  font-family: var(--font-body);
+  line-height: 1.8;
+  color: var(--ink);
+}
+
+.reader-page-content p {
+  margin-bottom: 1em;
+  text-align: justify;
+  hyphens: auto;
+}
+
+.reader-page-content h1, .reader-page-content h2, .reader-page-content h3 {
+  font-family: 'EB Garamond', serif;
+  font-weight: 600;
+  margin-bottom: 0.8em;
+  margin-top: 1.5em;
+  line-height: 1.3;
+}
+
+.reader-page-content h1 { font-size: 1.6em; }
+.reader-page-content h2 { font-size: 1.3em; }
+.reader-page-content h3 { font-size: 1.1em; }
+
+.reader-page-content em { font-style: italic; }
+.reader-page-content strong { font-weight: 600; }
+
+.reader-page-content img {
+  max-width: 100%;
+  filter: grayscale(100%);
+  display: block;
+  margin: 1em auto;
+}
+
+/* SVG cover pages — grayscale + fill viewport height */
+.reader-page-content svg {
+  filter: grayscale(100%);
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  margin: 0 auto;
+}
+
+.reader-page-content svg image {
+  filter: grayscale(100%);
+}
+
+.reader-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px;
+  border-top: 1px solid var(--paper-dark);
+  flex-shrink: 0;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+}
+
+.reader-page-number { font-family: var(--font-ui); }
+.reader-time-left { font-family: var(--font-ui); }
+.reader-chapter { font-style: italic; font-family: 'EB Garamond', serif; font-size: 11px; }
+
+/* Touch zones */
+.touch-zone {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 25%;
+  z-index: 100;
+  cursor: pointer;
+}
+
+.touch-zone-left { left: 0; }
+.touch-zone-right { right: 0; }
+.touch-zone-center {
+  left: 25%; right: 25%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+
+/* Page turn animation */
+@keyframes pageFlipRight {
+  0% { clip-path: inset(0 0 0 0); }
+  50% { clip-path: inset(0 50% 0 0); }
+  100% { clip-path: inset(0 100% 0 0); }
+}
+
+@keyframes pageFlipLeft {
+  0% { clip-path: inset(0 0 0 100%); }
+  50% { clip-path: inset(0 0 0 50%); }
+  100% { clip-path: inset(0 0 0 0); }
+}
+
+.page-turn-next { animation: pageFlipRight 0.3s steps(6, end) forwards; }
+.page-turn-prev { animation: pageFlipLeft 0.3s steps(6, end) forwards; }
+
+/* === SETTINGS PANEL === */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 500;
+  display: none;
+  align-items: flex-end;
+}
+
+.settings-overlay.open { display: flex; }
+
+.settings-panel {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  border-bottom: none;
+  padding: 0;
+  max-height: 85vh;
+  overflow-y: auto;
+  transition: var(--transition-eink-slow);
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--paper-dark);
+}
+
+.settings-title {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.settings-body { padding: 24px; }
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--paper-mid);
+}
+
+.setting-row:last-child { border-bottom: none; }
+
+.setting-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  flex-shrink: 0;
+}
+
+.setting-control { display: flex; align-items: center; gap: 8px; }
+
+.stepper-btn {
+  width: 28px; height: 28px;
+  border: 1px solid var(--ink);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--transition-eink);
+}
+
+.stepper-btn:active { background: var(--ink); color: var(--paper); }
+
+.stepper-val {
+  font-size: 11px;
+  min-width: 36px;
+  text-align: center;
+  font-family: var(--font-ui);
+}
+
+.toggle-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--ink);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  color: var(--ink);
+  transition: var(--transition-eink);
+}
+
+.toggle-btn.active { background: var(--ink); color: var(--paper); }
+
+.select-control {
+  background: transparent;
+  border: 1px solid var(--ink);
+  padding: 6px 10px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: var(--ink);
+  cursor: pointer;
+  outline: none;
+}
+
+.margin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  flex: 1;
+}
+
+.margin-field { display: flex; flex-direction: column; gap: 4px; }
+.margin-field label { font-size: 8px; letter-spacing: 0.1em; color: var(--ink-faint); text-transform: uppercase; }
+.margin-field input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--paper-dark);
+  padding: 4px 8px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: var(--ink);
+  outline: none;
+}
+
+/* === ADMIN PANEL === */
+#screen-admin {
+  flex-direction: column;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--ink);
+  flex-shrink: 0;
+}
+
+.admin-title {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.admin-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.admin-section {
+  margin-bottom: 40px;
+}
+
+.admin-section-title {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--paper-dark);
+}
+
+.user-table { width: 100%; border-collapse: collapse; }
+
+.user-table th {
+  font-size: 8px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--paper-dark);
+}
+
+.user-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--paper-mid);
+  font-size: 11px;
+  vertical-align: middle;
+}
+
+.user-status {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border: 1px solid var(--ink);
+}
+
+.user-status.blocked {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.user-actions { display: flex; gap: 8px; }
+
+.btn-small {
+  padding: 4px 10px;
+  border: 1px solid var(--ink);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  color: var(--ink);
+  transition: var(--transition-eink);
+}
+
+.btn-small:active { background: var(--ink); color: var(--paper); }
+.btn-small.danger { border-color: var(--ink); }
+
+.add-user-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.add-user-form .field-group { margin-bottom: 0; }
+.form-full { grid-column: 1/-1; }
+
+/* === STATS === */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.stat-card {
+  border: 1px solid var(--paper-dark);
+  padding: 16px;
+}
+
+.stat-value {
+  font-family: 'EB Garamond', serif;
+  font-size: 32px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* === TOC === */
+.toc-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 500;
+  display: none;
+}
+.toc-overlay.open { display: flex; }
+
+.toc-panel {
+  width: 280px;
+  height: 100%;
+  background: var(--paper);
+  border-right: 1px solid var(--ink);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.toc-header {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--paper-dark);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.toc-title {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.toc-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 0;
+}
+
+.toc-item {
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: var(--transition-eink);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-bottom: 1px solid var(--paper-mid);
+}
+
+.toc-item:active { background: var(--paper-mid); }
+.toc-item.active { background: var(--ink); color: var(--paper); }
+
+.toc-item-num {
+  font-size: 8px;
+  color: var(--ink-faint);
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-family: var(--font-ui);
+}
+.toc-item.active .toc-item-num { color: var(--paper); opacity: 0.6; }
+
+.toc-item-title {
+  font-family: 'EB Garamond', serif;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+/* === BOOK CONTEXT MENU === */
+.book-menu {
+  position: fixed;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  z-index: 600;
+  display: none;
+  flex-direction: column;
+  min-width: 160px;
+  box-shadow: var(--shadow-page);
+}
+
+.book-menu.open { display: flex; }
+
+.book-menu-item {
+  padding: 12px 16px;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  border-bottom: 1px solid var(--paper-mid);
+  transition: var(--transition-eink);
+  color: var(--ink);
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  font-family: var(--font-ui);
+  text-align: left;
+}
+
+.book-menu-item:last-child { border-bottom: none; }
+.book-menu-item:active { background: var(--ink); color: var(--paper); }
+.book-menu-item.danger { color: var(--ink); }
+
+/* === MODAL === */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 700;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  padding: 32px;
+  width: 100%;
+  max-width: 380px;
+  position: relative;
+}
+
+.modal-title {
+  font-family: 'EB Garamond', serif;
+  font-size: 22px;
+  font-style: italic;
+  margin-bottom: 16px;
+}
+
+.modal-text {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink-light);
+  margin-bottom: 24px;
+}
+
+.modal-actions { display: flex; gap: 12px; }
+
+.btn-secondary {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid var(--ink);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  color: var(--ink);
+  transition: var(--transition-eink);
+}
+
+.btn-secondary:active { background: var(--paper-mid); }
+
+/* === PROGRESS BAR === */
+.reader-progress {
+  height: 2px;
+  background: var(--paper-dark);
+  flex-shrink: 0;
+}
+
+.reader-progress-fill {
+  height: 100%;
+  background: var(--ink);
+  transition: width 0.3s steps(6, end);
+}
+
+/* === SCROLLBAR === */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--paper-mid); }
+::-webkit-scrollbar-thumb { background: var(--ink-faint); }
+
+/* === REGISTER FORM === */
+.register-link {
+  font-size: 10px;
+  color: var(--ink-faint);
+  text-align: center;
+  margin-top: 16px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* Loading */
+.loading-screen {
+  position: fixed; inset: 0;
+  background: var(--paper);
+  z-index: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 24px;
+  transition: var(--transition-eink-slow);
+}
+
+.loading-screen.hidden { opacity: 0; pointer-events: none; }
+
+.loading-logo {
+  font-family: 'EB Garamond', serif;
+  font-size: 56px;
+  font-style: italic;
+  letter-spacing: -0.03em;
+}
+
+.loading-bar-wrap {
+  width: 200px;
+  height: 2px;
+  background: var(--paper-dark);
+  overflow: hidden;
+}
+
+.loading-bar {
+  height: 100%;
+  background: var(--ink);
+  animation: loadingAnim 2s steps(20, end) forwards;
+}
+
+@keyframes loadingAnim {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+.loading-text {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  animation: blink 1s steps(2, end) infinite;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+/* Notifications */
+.notification {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--paper);
+  padding: 10px 20px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  z-index: 900;
+  opacity: 0;
+  transition: var(--transition-eink-slow);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.notification.show { opacity: 1; }
+
+/* Theme toggle */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-switch {
+  width: 40px; height: 20px;
+  border: 1px solid var(--ink);
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.toggle-switch-inner {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 14px; height: 14px;
+  background: var(--ink);
+  transition: var(--transition-eink);
+}
+
+[data-theme="dark"] .toggle-switch-inner {
+  transform: translateX(20px);
+}
+
+/* Tabs */
+.admin-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--paper-dark);
+  flex-shrink: 0;
+  padding: 0 24px;
+}
+
+.admin-tab {
+  padding: 12px 16px;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  font-family: var(--font-ui);
+  color: var(--ink-faint);
+  transition: var(--transition-eink);
+}
+
+.admin-tab.active {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.admin-tab-content { display: none; }
+.admin-tab-content.active { display: block; }
+
+/* Fluid vs locked scroll */
+.reader-page-content.locked {
+  overflow: hidden;
+}
+
+.reader-page-content.fluid {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Register modal */
+.register-note {
+  font-size: 10px;
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+/* File input hidden */
+input[type="file"] { display: none; }
+
+/* Responsive reader */
+@media (min-width: 768px) {
+  .reader-page-content {
+    max-width: 680px;
+    margin: 0 auto;
+  }
+}
+
+</style>
+</head>
+<body>
+
+<!-- E-ink flash effect -->
+<div class="eink-flash" id="einkFlash"></div>
+
+<!-- Loading screen -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-logo">Inkwell</div>
+  <div class="loading-bar-wrap">
+    <div class="loading-bar"></div>
+  </div>
+  <div class="loading-text">Iniciando</div>
+</div>
+
+<!-- Notification -->
+<div class="notification" id="notification"></div>
+
+<!-- SCREEN: LOGIN -->
+<div class="screen" id="screen-login">
+  <div class="login-container">
+    <div class="login-logo">Inkwell</div>
+    <div class="login-tagline">Leitor de E-books · Modo E-ink</div>
+
+    <div id="loginForm">
+      <div class="field-group">
+        <label class="field-label">E-mail</label>
+        <input class="field-input" type="email" id="loginEmail" placeholder="seu@email.com" autocomplete="email">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Senha</label>
+        <input class="field-input" type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn-primary" onclick="doLogin()">Entrar</button>
+      <div class="login-error" id="loginError"></div>
+      <div class="login-register-link" onclick="showRegisterModal()">Criar conta · R$29,00 acesso vitalício</div>
+    </div>
+
+    <div class="login-price">
+      <span>Acesso completo à plataforma</span>
+      <strong>R$ 29,00</strong>
+      <span>pagamento único · vitalício</span>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: LIBRARY -->
+<div class="screen" id="screen-library">
+  <div style="width:100%; height:100%; display:flex; flex-direction:column;">
+    <div class="library-header">
+      <div class="library-logo">Inkwell</div>
+      <div class="header-actions">
+        <button class="icon-btn" onclick="toggleTheme()" title="Alternar tema">◑</button>
+        <button class="icon-btn" id="adminBtn" onclick="showAdmin()" title="Administração" style="display:none">⊞</button>
+        <button class="icon-btn" onclick="doLogout()" title="Sair">⏻</button>
+      </div>
+    </div>
+
+    <div class="library-body" id="libraryBody">
+      <div class="library-section-title">Minha Biblioteca</div>
+      <div class="books-grid" id="booksGrid">
+        <!-- books populated by JS -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: READER -->
+<div class="screen" id="screen-reader">
+  <div style="width:100%;height:100%;display:flex;flex-direction:column;">
+    <div class="reader-header" id="readerHeader">
+      <button class="reader-back" onclick="closeReader()">← Voltar</button>
+      <div class="reader-title-header" id="readerTitleHeader">—</div>
+      <div class="reader-header-actions">
+        <button class="icon-btn" onclick="showTOC()">☰</button>
+        <button class="icon-btn" onclick="openSettings()">⚙</button>
+      </div>
+    </div>
+
+    <div class="reader-progress">
+      <div class="reader-progress-fill" id="readerProgressFill" style="width:0%"></div>
+    </div>
+
+    <div class="reader-body" id="readerBody">
+      <div class="reader-pages-container" id="pagesContainer">
+        <div class="reader-page" id="readerPage">
+          <div class="reader-page-content locked" id="pageContent">
+          </div>
+        </div>
+      </div>
+
+      <!-- Touch zones -->
+      <div class="touch-zone touch-zone-left" onclick="prevPage()"></div>
+      <div class="touch-zone touch-zone-right" onclick="nextPage()"></div>
+      <div class="touch-zone touch-zone-center" onclick="toggleReaderUI()"></div>
+    </div>
+
+    <div class="reader-footer" id="readerFooter">
+      <span class="reader-page-number" id="readerPageNum">pág. 1 / 1</span>
+      <span class="reader-chapter" id="readerChapterLabel">—</span>
+      <span class="reader-time-left" id="readerTimeLeft">— min restantes</span>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: ADMIN -->
+<div class="screen" id="screen-admin">
+  <div style="width:100%;height:100%;display:flex;flex-direction:column;">
+    <div class="admin-header">
+      <button class="reader-back" onclick="closeAdmin()">← Voltar</button>
+      <div class="admin-title">Painel de Administração</div>
+    </div>
+    <div class="admin-tabs">
+      <button class="admin-tab active" onclick="switchAdminTab('users')">Usuários</button>
+      <button class="admin-tab" onclick="switchAdminTab('stats')">Estatísticas</button>
+      <button class="admin-tab" onclick="switchAdminTab('create')">Criar Usuário</button>
+    </div>
+    <div class="admin-body">
+      <div class="admin-tab-content active" id="tab-users">
+        <div class="admin-section">
+          <div class="admin-section-title">Usuários Cadastrados</div>
+          <table class="user-table">
+            <thead>
+              <tr>
+                <th>E-mail</th>
+                <th>Perfil</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-tab-content" id="tab-stats">
+        <div class="admin-section">
+          <div class="admin-section-title">Estatísticas da Plataforma</div>
+          <div class="stats-grid" id="statsGrid">
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-tab-content" id="tab-create">
+        <div class="admin-section">
+          <div class="admin-section-title">Criar Novo Usuário</div>
+          <div class="add-user-form">
+            <div class="field-group">
+              <label class="field-label">E-mail</label>
+              <input class="field-input" type="email" id="newUserEmail" placeholder="usuario@email.com">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Senha</label>
+              <input class="field-input" type="password" id="newUserPassword" placeholder="Mínimo 6 caracteres">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Perfil</label>
+              <select class="select-control" id="newUserRole" style="width:100%">
+                <option value="user">Usuário</option>
+                <option value="admin">Super-Admin</option>
+              </select>
+            </div>
+            <div class="form-full">
+              <button class="btn-primary" onclick="createUser()">Criar Usuário</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal-overlay" id="editUserOverlay" onclick="closeEditUserOutside(event)">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title">Editar Usuário</div>
+    <div class="field-group" style="margin-bottom:14px">
+      <label class="field-label">E-mail</label>
+      <input class="field-input" type="email" id="editUserEmail" placeholder="usuario@email.com">
+    </div>
+    <div class="field-group" style="margin-bottom:14px">
+      <label class="field-label">Nova Senha <span style="font-size:9px;color:var(--ink-faint)">(deixe em branco para manter)</span></label>
+      <input class="field-input" type="password" id="editUserPassword" placeholder="Mínimo 6 caracteres">
+    </div>
+    <div class="field-group" style="margin-bottom:24px">
+      <label class="field-label">Perfil</label>
+      <select class="select-control" id="editUserRole" style="width:100%">
+        <option value="user">Usuário</option>
+        <option value="admin">Super-Admin</option>
+      </select>
+    </div>
+    <input type="hidden" id="editUserId">
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeEditUser()">Cancelar</button>
+      <button class="btn-primary" onclick="saveEditUser()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Overlay -->
+<div class="settings-overlay" id="settingsOverlay" onclick="closeSettingsOutside(event)">
+  <div class="settings-panel">
+    <div class="settings-header">
+      <span class="settings-title">Configurações de Leitura</span>
+      <button class="icon-btn" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="settings-body">
+
+      <div class="setting-row">
+        <span class="setting-label">Tamanho da Fonte</span>
+        <div class="setting-control">
+          <button class="stepper-btn" onclick="adjustFont(-1)">−</button>
+          <span class="stepper-val" id="fontSizeVal">18</span>
+          <button class="stepper-btn" onclick="adjustFont(1)">+</button>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <span class="setting-label">Espaçamento</span>
+        <div class="setting-control">
+          <button class="stepper-btn" onclick="adjustSpacing(-0.1)">−</button>
+          <span class="stepper-val" id="spacingVal">1.8</span>
+          <button class="stepper-btn" onclick="adjustSpacing(0.1)">+</button>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <span class="setting-label">Fonte</span>
+        <div class="setting-control">
+          <select class="select-control" id="fontFamilySelect" onchange="changeFont(this.value)">
+            <option value="'EB Garamond', serif">Garamond</option>
+            <option value="'Libre Baskerville', serif">Baskerville</option>
+            <option value="'Lora', serif">Lora</option>
+            <option value="'Merriweather', serif">Merriweather</option>
+            <option value="'Crimson Pro', serif">Crimson</option>
+            <option value="'PT Serif', serif">PT Serif</option>
+            <option value="'Source Serif 4', serif">Source Serif</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <span class="setting-label">Tema</span>
+        <div class="setting-control theme-toggle">
+          <span style="font-size:9px;letter-spacing:0.05em">Claro</span>
+          <div class="toggle-switch" onclick="toggleTheme()">
+            <div class="toggle-switch-inner"></div>
+          </div>
+          <span style="font-size:9px;letter-spacing:0.05em">Escuro</span>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <span class="setting-label">Rolagem</span>
+        <div class="setting-control">
+          <button class="toggle-btn active" id="btnLocked" onclick="setScrollMode('locked')">Paginado</button>
+          <button class="toggle-btn" id="btnFluid" onclick="setScrollMode('fluid')">Fluído</button>
+        </div>
+      </div>
+
+      <div class="setting-row" style="align-items:flex-start; flex-direction:column; gap:12px;">
+        <span class="setting-label">Margens (px)</span>
+        <div class="margin-grid" style="width:100%">
+          <div class="margin-field">
+            <label>Superior</label>
+            <input type="number" id="marginTop" value="32" min="8" max="80" onchange="updateMargins()">
+          </div>
+          <div class="margin-field">
+            <label>Inferior</label>
+            <input type="number" id="marginBottom" value="32" min="8" max="80" onchange="updateMargins()">
+          </div>
+          <div class="margin-field">
+            <label>Esquerda</label>
+            <input type="number" id="marginLeft" value="28" min="8" max="80" onchange="updateMargins()">
+          </div>
+          <div class="margin-field">
+            <label>Direita</label>
+            <input type="number" id="marginRight" value="28" min="8" max="80" onchange="updateMargins()">
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- TOC Overlay -->
+<div class="toc-overlay" id="tocOverlay" onclick="closeTOCOutside(event)">
+  <div class="toc-panel">
+    <div class="toc-header">
+      <span class="toc-title">Capítulos</span>
+      <button class="icon-btn" onclick="closeTOC()">✕</button>
+    </div>
+    <div class="toc-list" id="tocList">
+    </div>
+  </div>
+</div>
+
+<!-- Book Context Menu -->
+<div class="book-menu" id="bookMenu">
+  <button class="book-menu-item" onclick="openBookFromMenu()">📖 Abrir</button>
+  <button class="book-menu-item" onclick="deleteBookFromMenu()">✕ Remover</button>
+</div>
+
+<!-- Modal: Register -->
+<div class="modal-overlay" id="registerModal">
+  <div class="modal">
+    <div class="modal-title">Criar Conta</div>
+    <div class="modal-text">Acesso vitalício por R$29,00. Após o cadastro, sua conta ficará pendente de aprovação pelo administrador.</div>
+    <div class="field-group">
+      <label class="field-label">E-mail</label>
+      <input class="field-input" type="email" id="regEmail" placeholder="seu@email.com">
+    </div>
+    <div class="field-group">
+      <label class="field-label">Senha</label>
+      <input class="field-input" type="password" id="regPassword" placeholder="Mínimo 6 caracteres">
+    </div>
+    <div class="register-note">Após o registro, aguarde a aprovação do administrador para acessar a plataforma.</div>
+    <div class="modal-actions" style="margin-top:24px">
+      <button class="btn-secondary" onclick="closeRegisterModal()">Cancelar</button>
+      <button class="btn-primary" style="flex:1" onclick="doRegister()">Criar Conta</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Confirm Delete -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <div class="modal-title" id="confirmTitle">Confirmar</div>
+    <div class="modal-text" id="confirmText">Tem certeza?</div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeConfirm()">Cancelar</button>
+      <button class="btn-primary" style="flex:1" onclick="runConfirm()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden file input -->
+<input type="file" id="epubFileInput" accept=".epub" multiple>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let APP = {
+  currentUser: null,
+  currentBook: null,
+  books: [], // [{id, title, author, cover, progress, spine, toc, pageData, currentPage, timePerPage, totalPages}]
+  settings: {
+    fontSize: 18,
+    lineSpacing: 1.8,
+    fontFamily: "'EB Garamond', serif",
+    theme: 'light',
+    scrollMode: 'locked',
+    marginTop: 32,
+    marginBottom: 32,
+    marginLeft: 28,
+    marginRight: 28
+  },
+  readerUIVisible: true,
+  contextMenuBook: null,
+  confirmCallback: null,
+  readingStats: {} // bookId -> {pagesRead, timestamps[]}
+};
+
+// ============================================================
+// STORAGE HELPERS
+// ============================================================
+function saveState() {
+  try {
+    localStorage.setItem('inkwell_books_meta', JSON.stringify(
+      APP.books.map(b => ({
+        id: b.id, title: b.title, author: b.author,
+        cover: b.cover, currentPage: b.currentPage,
+        totalPages: b.totalPages, timePerPage: b.timePerPage
+      }))
+    ));
+    localStorage.setItem('inkwell_settings', JSON.stringify(APP.settings));
+    localStorage.setItem('inkwell_reading_stats', JSON.stringify(APP.readingStats));
+  } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const s = localStorage.getItem('inkwell_settings');
+    if (s) APP.settings = { ...APP.settings, ...JSON.parse(s) };
+    const rs = localStorage.getItem('inkwell_reading_stats');
+    if (rs) APP.readingStats = JSON.parse(rs);
+  } catch(e) {}
+}
+
+function getUsers() {
+  try { return JSON.parse(localStorage.getItem('inkwell_users') || '[]'); }
+  catch(e) { return []; }
+}
+
+function saveUsers(users) {
+  localStorage.setItem('inkwell_users', JSON.stringify(users));
+}
+
+function initDefaultAdmin() {
+  let users = getUsers();
+  if (!users.find(u => u.role === 'admin')) {
+    users.push({
+      id: 'admin_1',
+      email: 'admin@inkwell.com',
+      password: 'admin123',
+      role: 'admin',
+      status: 'active',
+      created: new Date().toISOString()
+    });
+    saveUsers(users);
+  }
+}
+
+// ============================================================
+// STARTUP
+// ============================================================
+window.addEventListener('load', () => {
+  initDefaultAdmin();
+  loadState();
+  applySettings();
+
+  // Load book metadata (not actual content — that's in IndexedDB)
+  loadBooksFromIndexedDB();
+
+  setTimeout(() => {
+    const ls = document.getElementById('loadingScreen');
+    ls.classList.add('hidden');
+    setTimeout(() => ls.remove(), 500);
+    showScreen('screen-login');
+  }, 2200);
+});
+
+// ============================================================
+// INDEXEDDB FOR BOOK CONTENT
+// ============================================================
+let db;
+
+function initDB() {
+  return new Promise((res, rej) => {
+    if (db) { res(db); return; }
+    const req = indexedDB.open('inkwell_db', 2);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('books')) {
+        d.createObjectStore('books', { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = e => { db = e.target.result; res(db); };
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function saveBookToDB(bookData) {
+  await initDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('books', 'readwrite');
+    tx.objectStore('books').put(bookData);
+    tx.oncomplete = res;
+    tx.onerror = () => rej(tx.error);
+  });
+}
+
+async function getBookFromDB(id) {
+  await initDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('books', 'readonly');
+    const req = tx.objectStore('books').get(id);
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function deleteBookFromDB(id) {
+  await initDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('books', 'readwrite');
+    tx.objectStore('books').delete(id);
+    tx.oncomplete = res;
+    tx.onerror = () => rej(tx.error);
+  });
+}
+
+async function loadBooksFromIndexedDB() {
+  await initDB();
+  return new Promise((res) => {
+    const tx = db.transaction('books', 'readonly');
+    const req = tx.objectStore('books').getAll();
+    req.onsuccess = () => {
+      const raw = req.result || [];
+      APP.books = raw.map(b => ({
+        id: b.id,
+        title: b.title,
+        author: b.author,
+        cover: b.cover,
+        currentPage: b.currentPage || 0,
+        totalPages: b.totalPages || 0,
+        timePerPage: b.timePerPage || 0,
+        spine: b.spine || [],
+        toc: b.toc || [],
+        pageData: b.pageData || []
+      }));
+      res();
+    };
+    req.onerror = () => res();
+  });
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+
+  if (!email || !pass) { errEl.textContent = 'Preencha todos os campos.'; return; }
+
+  const users = getUsers();
+  const user = users.find(u => u.email === email && u.password === pass);
+
+  if (!user) { errEl.textContent = 'E-mail ou senha incorretos.'; return; }
+  if (user.status === 'blocked') { errEl.textContent = 'Conta bloqueada. Contate o administrador.'; return; }
+  if (user.status === 'pending') { errEl.textContent = 'Conta aguardando aprovação.'; return; }
+
+  APP.currentUser = user;
+  errEl.textContent = '';
+  einkFlash(() => showScreen('screen-library'));
+  document.getElementById('adminBtn').style.display = user.role === 'admin' ? '' : 'none';
+  renderLibrary();
+}
+
+function doLogout() {
+  saveState();
+  APP.currentUser = null;
+  APP.currentBook = null;
+  einkFlash(() => showScreen('screen-login'));
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginError').textContent = '';
+}
+
+function showRegisterModal() {
+  document.getElementById('registerModal').classList.add('open');
+}
+
+function closeRegisterModal() {
+  document.getElementById('registerModal').classList.remove('open');
+}
+
+function doRegister() {
+  const email = document.getElementById('regEmail').value.trim();
+  const pass = document.getElementById('regPassword').value;
+
+  if (!email || pass.length < 6) {
+    showNotification('Preencha e-mail e senha (mín. 6 chars)');
+    return;
+  }
+
+  let users = getUsers();
+  if (users.find(u => u.email === email)) {
+    showNotification('E-mail já cadastrado');
+    return;
+  }
+
+  users.push({
+    id: 'u_' + Date.now(),
+    email, password: pass,
+    role: 'user',
+    status: 'pending',
+    created: new Date().toISOString()
+  });
+  saveUsers(users);
+  closeRegisterModal();
+  showNotification('Conta criada! Aguarde aprovação.');
+}
+
+// ============================================================
+// SCREENS
+// ============================================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function einkFlash(cb) {
+  const f = document.getElementById('einkFlash');
+  f.classList.add('flash');
+  setTimeout(() => {
+    f.classList.remove('flash');
+    if (cb) cb();
+  }, 180);
+}
+
+// ============================================================
+// THEME
+// ============================================================
+function toggleTheme() {
+  APP.settings.theme = APP.settings.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', APP.settings.theme);
+  saveState();
+}
+
+function applySettings() {
+  document.documentElement.setAttribute('data-theme', APP.settings.theme);
+  document.getElementById('fontSizeVal').textContent = APP.settings.fontSize;
+  document.getElementById('spacingVal').textContent = APP.settings.lineSpacing.toFixed(1);
+  document.getElementById('fontFamilySelect').value = APP.settings.fontFamily;
+  document.getElementById('marginTop').value = APP.settings.marginTop;
+  document.getElementById('marginBottom').value = APP.settings.marginBottom;
+  document.getElementById('marginLeft').value = APP.settings.marginLeft;
+  document.getElementById('marginRight').value = APP.settings.marginRight;
+
+  const isLocked = APP.settings.scrollMode === 'locked';
+  document.getElementById('btnLocked').classList.toggle('active', isLocked);
+  document.getElementById('btnFluid').classList.toggle('active', !isLocked);
+
+  applyReaderStyles();
+}
+
+function applyReaderStyles() {
+  const pc = document.getElementById('pageContent');
+  if (!pc) return;
+  pc.style.fontSize = APP.settings.fontSize + 'px';
+  pc.style.lineHeight = APP.settings.lineSpacing;
+  pc.style.fontFamily = APP.settings.fontFamily;
+  pc.style.padding = `${APP.settings.marginTop}px ${APP.settings.marginRight}px ${APP.settings.marginBottom}px ${APP.settings.marginLeft}px`;
+
+  pc.classList.remove('locked', 'fluid');
+  pc.classList.add(APP.settings.scrollMode);
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+function openSettings() {
+  document.getElementById('settingsOverlay').classList.add('open');
+  applySettings();
+}
+
+function closeSettings() {
+  document.getElementById('settingsOverlay').classList.remove('open');
+  repaginateCurrentBook();
+}
+
+function closeSettingsOutside(e) {
+  if (e.target === document.getElementById('settingsOverlay')) closeSettings();
+}
+
+function adjustFont(delta) {
+  APP.settings.fontSize = Math.min(32, Math.max(12, APP.settings.fontSize + delta));
+  document.getElementById('fontSizeVal').textContent = APP.settings.fontSize;
+  applyReaderStyles();
+  saveState();
+}
+
+function adjustSpacing(delta) {
+  APP.settings.lineSpacing = Math.min(3.0, Math.max(1.2, APP.settings.lineSpacing + delta));
+  document.getElementById('spacingVal').textContent = APP.settings.lineSpacing.toFixed(1);
+  applyReaderStyles();
+  saveState();
+}
+
+function changeFont(val) {
+  APP.settings.fontFamily = val;
+  applyReaderStyles();
+  saveState();
+}
+
+function setScrollMode(mode) {
+  APP.settings.scrollMode = mode;
+  document.getElementById('btnLocked').classList.toggle('active', mode === 'locked');
+  document.getElementById('btnFluid').classList.toggle('active', mode === 'fluid');
+  applyReaderStyles();
+  saveState();
+}
+
+function updateMargins() {
+  APP.settings.marginTop = parseInt(document.getElementById('marginTop').value) || 32;
+  APP.settings.marginBottom = parseInt(document.getElementById('marginBottom').value) || 32;
+  APP.settings.marginLeft = parseInt(document.getElementById('marginLeft').value) || 28;
+  APP.settings.marginRight = parseInt(document.getElementById('marginRight').value) || 28;
+  applyReaderStyles();
+  saveState();
+}
+
+// ============================================================
+// LIBRARY
+// ============================================================
+function renderLibrary() {
+  const grid = document.getElementById('booksGrid');
+  grid.innerHTML = '';
+
+  // Add book card
+  const addCard = document.createElement('div');
+  addCard.className = 'add-book-card';
+  addCard.innerHTML = `
+    <div class="add-book-area" onclick="triggerFileInput()">
+      <div class="add-icon">+</div>
+      <div class="add-label">Adicionar<br>E-book (.epub)</div>
+    </div>
+    <div class="book-info" style="margin-top:10px">
+      <div class="book-title-label" style="font-size:11px;color:var(--ink-faint)">Importar arquivo</div>
+    </div>
+  `;
+  grid.appendChild(addCard);
+
+  if (APP.books.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-library';
+    empty.innerHTML = `
+      <div class="empty-icon">📚</div>
+      <div class="empty-text">Biblioteca vazia</div>
+      <div class="empty-sub">Toque em + para adicionar seu primeiro e-book</div>
+    `;
+    grid.appendChild(empty);
+    return;
+  }
+
+  APP.books.forEach(book => {
+    const card = document.createElement('div');
+    card.className = 'book-card';
+    card.dataset.id = book.id;
+
+    const progress = book.totalPages > 0 ? (book.currentPage / book.totalPages * 100) : 0;
+
+    card.innerHTML = `
+      <div class="book-cover-wrap" onclick="openBook('${book.id}')">
+        <div class="placeholder-spine"></div>
+        ${book.cover
+          ? `<img src="${book.cover}" alt="${book.title}" loading="lazy">`
+          : `<div class="book-cover-placeholder">
+               <div class="placeholder-title">${book.title}</div>
+               <div class="placeholder-author">${book.author}</div>
+             </div>`
+        }
+        <div class="book-progress-bar">
+          <div class="book-progress-fill" style="width:${progress}%"></div>
+        </div>
+      </div>
+      <div class="book-info">
+        <div class="book-title-label">${book.title}</div>
+        <div class="book-author-label">${book.author}</div>
+      </div>
+    `;
+
+    card.addEventListener('contextmenu', e => { e.preventDefault(); showBookMenu(e, book.id); });
+    card.addEventListener('pointerdown', e => {
+      if (e.pointerType === 'touch') {
+        const timer = setTimeout(() => showBookMenu(e, book.id), 600);
+        card.addEventListener('pointerup', () => clearTimeout(timer), { once: true });
+        card.addEventListener('pointermove', () => clearTimeout(timer), { once: true });
+      }
+    });
+
+    grid.appendChild(card);
+  });
+}
+
+function triggerFileInput() {
+  document.getElementById('epubFileInput').click();
+}
+
+document.getElementById('epubFileInput').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+
+  showNotification('Processando e-book...');
+
+  for (const file of files) {
+    await processEpubFile(file);
+  }
+
+  e.target.value = '';
+  renderLibrary();
+  showNotification('Livro adicionado!');
+});
+
+// ============================================================
+// EPUB PARSER
+// ============================================================
+async function processEpubFile(file) {
+  try {
+    const zip = await JSZip.loadAsync(file);
+
+    // Parse container
+    const containerXml = await zip.file('META-INF/container.xml').async('string');
+    const parser = new DOMParser();
+    const containerDoc = parser.parseFromString(containerXml, 'application/xml');
+    const rootfilePath = containerDoc.querySelector('rootfile').getAttribute('full-path');
+    const basePath = rootfilePath.includes('/') ? rootfilePath.substring(0, rootfilePath.lastIndexOf('/') + 1) : '';
+
+    const opfXml = await zip.file(rootfilePath).async('string');
+    const opfDoc = parser.parseFromString(opfXml, 'application/xml');
+
+    // Metadata
+    const title = opfDoc.querySelector('title')?.textContent?.trim() || file.name.replace('.epub', '');
+    const creator = opfDoc.querySelector('creator')?.textContent?.trim() || 'Autor desconhecido';
+
+    // Cover — try multiple EPUB2 and EPUB3 methods
+    let coverDataUrl = null;
+    try {
+      let coverItem = null;
+
+      // Method 1: EPUB2 — meta[name="cover"] points to manifest item id
+      const coverId = opfDoc.querySelector('meta[name="cover"]')?.getAttribute('content');
+      if (coverId) {
+        coverItem = opfDoc.querySelector(`item[id="${coverId}"]`);
+      }
+
+      // Method 2: EPUB3 — item with properties containing "cover-image"
+      if (!coverItem) {
+        coverItem = Array.from(opfDoc.querySelectorAll('item')).find(item => {
+          const props = item.getAttribute('properties') || '';
+          return props.split(' ').includes('cover-image');
+        });
+      }
+
+      // Method 3: item whose id or href contains "cover" (case-insensitive)
+      if (!coverItem) {
+        const allImages = Array.from(opfDoc.querySelectorAll('item[media-type^="image/"]'));
+        coverItem = allImages.find(item => {
+          const href = (item.getAttribute('href') || '').toLowerCase();
+          const id = (item.getAttribute('id') || '').toLowerCase();
+          return href.includes('cover') || id.includes('cover');
+        });
+      }
+
+      // Method 4: fallback — first image in manifest
+      if (!coverItem) {
+        coverItem = opfDoc.querySelector('item[media-type^="image/"]');
+      }
+
+      if (coverItem) {
+        const rawHref = coverItem.getAttribute('href') || '';
+        const coverHref = resolveEpubPath(basePath, rawHref);
+        const coverFile = zip.file(coverHref)
+          || zip.file(decodeURIComponent(coverHref))
+          || zip.file(rawHref)
+          || zip.file(decodeURIComponent(rawHref));
+        if (coverFile) {
+          const coverBytes = await coverFile.async('base64');
+          const mt = coverItem.getAttribute('media-type') || 'image/jpeg';
+          coverDataUrl = `data:${mt};base64,${coverBytes}`;
+        }
+      }
+    } catch(e2) {}
+
+    // Spine
+    const manifestItems = {};
+    opfDoc.querySelectorAll('manifest item').forEach(item => {
+      manifestItems[item.getAttribute('id')] = {
+        href: item.getAttribute('href'),
+        type: item.getAttribute('media-type')
+      };
+    });
+
+    const spineItems = [];
+    opfDoc.querySelectorAll('spine itemref').forEach(ref => {
+      const id = ref.getAttribute('idref');
+      if (manifestItems[id] && manifestItems[id].type === 'application/xhtml+xml') {
+        spineItems.push({ id, href: basePath + manifestItems[id].href });
+      }
+    });
+
+    // TOC — try toc.ncx or nav
+    const toc = [];
+    try {
+      const ncxId = opfDoc.querySelector('spine')?.getAttribute('toc');
+      const ncxHref = ncxId && manifestItems[ncxId] ? basePath + manifestItems[ncxId].href : null;
+      const tocFile = ncxHref ? (zip.file(ncxHref) || zip.file(decodeURIComponent(ncxHref))) : null;
+
+      if (tocFile) {
+        const ncxXml = await tocFile.async('string');
+        const ncxDoc = parser.parseFromString(ncxXml, 'application/xml');
+        ncxDoc.querySelectorAll('navPoint').forEach((np, idx) => {
+          const label = np.querySelector('navLabel text')?.textContent?.trim() || `Capítulo ${idx+1}`;
+          const src = np.querySelector('content')?.getAttribute('src') || '';
+          toc.push({ label, src, spineIndex: 0 });
+        });
+      }
+    } catch(e3) {}
+
+    // Load chapter HTML content (resolve images to data URLs)
+    const chapterContents = [];
+    for (const item of spineItems) {
+      try {
+        const f = zip.file(item.href) || zip.file(decodeURIComponent(item.href));
+        if (f) {
+          const html = await f.async('string');
+          const resolved = await resolveChapterImages(html, item.href, zip);
+          chapterContents.push({ href: item.href, html: cleanChapterHtml(resolved) });
+        }
+      } catch(e4) {}
+    }
+
+    // Map TOC to spine
+    toc.forEach(entry => {
+      const srcBase = entry.src.split('#')[0];
+      const idx = spineItems.findIndex(s => s.href.endsWith(srcBase) || decodeURIComponent(s.href).endsWith(srcBase));
+      entry.spineIndex = idx >= 0 ? idx : 0;
+    });
+
+    const bookId = 'book_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
+
+    const bookData = {
+      id: bookId,
+      title,
+      author: creator,
+      cover: coverDataUrl,
+      currentPage: 0,
+      totalPages: 0,
+      timePerPage: 0,
+      spine: spineItems,
+      toc,
+      chapterContents,
+      pageData: [] // populated on first open
+    };
+
+    await saveBookToDB(bookData);
+
+    APP.books.unshift({
+      id: bookId,
+      title,
+      author: creator,
+      cover: coverDataUrl,
+      currentPage: 0,
+      totalPages: 0,
+      timePerPage: 0,
+      spine: spineItems,
+      toc,
+      chapterContents,
+      pageData: []
+    });
+
+  } catch(err) {
+    console.error('EPUB parse error', err);
+    showNotification('Erro ao processar arquivo');
+  }
+}
+
+function resolveEpubPath(basePath, href) {
+  // If href is absolute within EPUB (starts with /), strip leading /
+  if (href.startsWith('/')) return href.slice(1);
+  // Combine basePath + href, then resolve any ../ segments
+  const combined = basePath + href;
+  const parts = combined.split('/');
+  const resolved = [];
+  for (const part of parts) {
+    if (part === '..') {
+      resolved.pop();
+    } else if (part !== '.') {
+      resolved.push(part);
+    }
+  }
+  return resolved.join('/');
+}
+
+async function resolveChapterImages(html, chapterHref, zip) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+
+  const chapterDir = chapterHref.includes('/')
+    ? chapterHref.substring(0, chapterHref.lastIndexOf('/') + 1)
+    : '';
+
+  const mimeMap = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+    gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp'
+  };
+
+  // Helper to resolve and embed one image reference
+  async function resolveRef(rawRef) {
+    if (!rawRef || rawRef.startsWith('data:')) return null;
+    try {
+      const imgPath = resolveEpubPath(chapterDir, rawRef);
+      const imgFile = zip.file(imgPath) || zip.file(decodeURIComponent(imgPath))
+                   || zip.file(rawRef)   || zip.file(decodeURIComponent(rawRef));
+      if (!imgFile) return null;
+      const bytes = await imgFile.async('base64');
+      const ext = imgPath.split('.').pop().toLowerCase().split('?')[0];
+      const mt = mimeMap[ext] || 'image/jpeg';
+      return `data:${mt};base64,${bytes}`;
+    } catch(e) { return null; }
+  }
+
+  // 1. Standard <img src> elements
+  for (const img of doc.querySelectorAll('img[src]')) {
+    const src = img.getAttribute('src');
+    if (!src || src.startsWith('data:')) continue;
+    try {
+      const imgPath = resolveEpubPath(chapterDir, src);
+
+      const imgFile = zip.file(imgPath) || zip.file(decodeURIComponent(imgPath));
+      if (imgFile) {
+        const bytes = await imgFile.async('base64');
+        const ext = imgPath.split('.').pop().toLowerCase().split('?')[0];
+        const mt = mimeMap[ext] || 'image/jpeg';
+        img.setAttribute('src', `data:${mt};base64,${bytes}`);
+      }
+    } catch(e) {}
+  }
+
+  // 2. SVG <image xlink:href> elements (common in EPUB cover pages)
+  for (const svgImg of doc.querySelectorAll('image')) {
+    const ref = svgImg.getAttribute('xlink:href') || svgImg.getAttribute('href') || '';
+    if (!ref || ref.startsWith('data:')) continue;
+    const dataUrl = await resolveRef(ref);
+    if (dataUrl) {
+      svgImg.setAttribute('xlink:href', dataUrl);
+      svgImg.setAttribute('href', dataUrl);
+    }
+  }
+
+  return doc.documentElement.outerHTML;
+}
+
+function cleanChapterHtml(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  // Remove scripts/styles
+  doc.querySelectorAll('script, style, link').forEach(el => el.remove());
+  // Get body content
+  return doc.body ? doc.body.innerHTML : html;
+}
+
+// ============================================================
+// READER
+// ============================================================
+let pageStartTime = null;
+let currentChapterIndex = 0;
+let allPages = []; // array of { chapterIndex, html (chunk) }
+
+async function openBook(bookId) {
+  const book = APP.books.find(b => b.id === bookId);
+  if (!book) return;
+
+  // Load full book from IndexedDB if needed
+  if (!book.chapterContents) {
+    const full = await getBookFromDB(bookId);
+    if (full) Object.assign(book, full);
+  }
+
+  APP.currentBook = book;
+
+  einkFlash(() => {
+    showScreen('screen-reader');
+    document.getElementById('readerTitleHeader').textContent = book.title;
+    renderTOC(book);
+    applyReaderStyles();
+    // Wait for BOTH the reader layout AND web fonts to be ready before
+    // paginating — font metrics affect line-wrapping and measured heights.
+    // document.fonts.ready resolves when all used fonts have loaded.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const pc = document.getElementById('pageContent');
+        const layoutReady = new Promise(resolve => {
+          function check(attempt) {
+            if (pc && pc.offsetWidth > 100) { resolve(); }
+            else if (attempt < 10) { setTimeout(() => check(attempt + 1), 50 * (attempt + 1)); }
+            else { resolve(); } // give up, paginate anyway
+          }
+          check(0);
+        });
+        Promise.all([layoutReady, document.fonts.ready]).then(() => {
+          paginateBook(book);
+        });
+      });
+    });
+  });
+}
+
+function paginateBook(book) {
+  // Build flat page list from all chapters
+  allPages = [];
+  if (!book.chapterContents || book.chapterContents.length === 0) {
+    allPages = [{ chapterIndex: 0, html: '<p>Conteúdo não disponível.</p>' }];
+  } else {
+    book.chapterContents.forEach((ch, chIdx) => {
+      const chunks = splitIntoPages(ch.html);
+      chunks.forEach(chunk => allPages.push({ chapterIndex: chIdx, html: chunk }));
+    });
+  }
+
+  if (allPages.length === 0) allPages = [{ chapterIndex: 0, html: '<p>Livro vazio.</p>' }];
+
+  book.totalPages = allPages.length;
+  if (book.currentPage >= allPages.length) book.currentPage = 0;
+
+  renderPage(book.currentPage);
+  updateReaderFooter();
+  saveBookToDB(book);
+  saveState();
+}
+
+function getAvailablePageHeight() {
+  const header = document.querySelector('#screen-reader .reader-header');
+  const footer = document.querySelector('#screen-reader .reader-footer');
+  const headerH = header ? header.offsetHeight : 44;
+  const footerH = footer ? footer.offsetHeight : 36;
+  return window.innerHeight - headerH - footerH;
+}
+
+function splitIntoPages(html) {
+  const s = APP.settings;
+  const pageHeight = getAvailablePageHeight();
+
+  // Parse nodes from chapter HTML
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+  const nodes = Array.from(doc.body.firstChild.childNodes);
+
+  // Get page content width for accurate measurement
+  const pageContent = document.getElementById('pageContent');
+  const contentWidth = pageContent ? pageContent.offsetWidth : window.innerWidth;
+
+  // Create hidden measurement container matching exact reader styles.
+  // IMPORTANT: must include class "reader-page-content" so CSS rules like
+  // "p { margin-bottom: 1em }" are applied — otherwise paragraphs measure
+  // shorter than they actually render, causing page overflow.
+  const measurer = document.createElement('div');
+  measurer.className = 'reader-page-content';
+  measurer.style.cssText = [
+    'position:fixed',
+    'left:-9999px',
+    'top:0',
+    `width:${contentWidth}px`,
+    `font-size:${s.fontSize}px`,
+    `font-family:${s.fontFamily}`,
+    'line-height:1.8',
+    `padding:${s.marginTop}px ${s.marginRight}px ${s.marginBottom}px ${s.marginLeft}px`,
+    'box-sizing:border-box',
+    'visibility:hidden',
+    'pointer-events:none',
+    'z-index:-1',
+    'overflow:hidden',
+    'flex:none',    /* override flex:1 from .reader-page-content */
+    'max-width:none' /* override max-width media query so width is honored */
+  ].join(';');
+  document.body.appendChild(measurer);
+
+  const pages = [];
+  let currentHtml = '';
+
+  for (const node of nodes) {
+    const nodeHtml = node.nodeType === 3
+      ? node.textContent
+      : (node.outerHTML || '');
+    if (!nodeHtml.trim()) continue;
+
+    const testHtml = currentHtml + nodeHtml;
+    measurer.innerHTML = testHtml;
+
+    if (measurer.offsetHeight > pageHeight && currentHtml.trim()) {
+      // Current accumulation fills a page — save it, start fresh with this node
+      pages.push(currentHtml);
+      currentHtml = nodeHtml;
+      // If a single node alone is taller than a page, still keep it (no infinite split)
+    } else {
+      currentHtml = testHtml;
+    }
+  }
+
+  if (currentHtml.trim()) pages.push(currentHtml);
+
+  document.body.removeChild(measurer);
+
+  return pages.length > 0 ? pages : [html || '<p>&nbsp;</p>'];
+}
+
+function repaginateCurrentBook() {
+  if (!APP.currentBook) return;
+  const savedPage = APP.currentBook.currentPage;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      paginateBook(APP.currentBook);
+      APP.currentBook.currentPage = Math.min(savedPage, allPages.length - 1);
+      renderPage(APP.currentBook.currentPage);
+      updateReaderFooter();
+    });
+  });
+}
+
+function renderPage(pageIndex) {
+  if (pageIndex < 0 || pageIndex >= allPages.length) return;
+
+  const page = allPages[pageIndex];
+  const pc = document.getElementById('pageContent');
+  pc.innerHTML = page.html;
+
+  const book = APP.currentBook;
+
+  // Always reset cover-page layout styles before rendering any page
+  pc.style.display = '';
+  pc.style.alignItems = '';
+  pc.style.justifyContent = '';
+  pc.style.padding = '';
+
+  // Detect cover pages: SVG-only pages on page 0 with a stored cover
+  const hasSvgImage = pc.querySelector('svg image, svg img') !== null;
+  const hasOnlyImage = pc.querySelector('svg') !== null &&
+    (pc.textContent || '').trim().length < 10;
+
+  if (pageIndex === 0 && hasSvgImage && hasOnlyImage && book && book.cover) {
+    // Replace cover page with a clean full-height centered img
+    pc.innerHTML = `<img src="${book.cover}"
+      style="display:block;max-width:100%;max-height:100%;
+             width:auto;height:100%;margin:0 auto;
+             object-fit:contain;filter:grayscale(100%);" alt="Capa">`;
+    pc.style.padding = '0';
+    pc.style.display = 'flex';
+    pc.style.alignItems = 'center';
+    pc.style.justifyContent = 'center';
+  } else {
+    // Normal page: apply reader styles first, then fix any broken images
+    applyReaderStyles();
+    pc.querySelectorAll('img').forEach(img => {
+      const src = img.getAttribute('src') || '';
+      if (!src.startsWith('data:') && src !== '') {
+        if (book && book.cover && src.toLowerCase().includes('cover')) {
+          img.src = book.cover;
+        } else {
+          img.style.display = 'none';
+        }
+      }
+    });
+    pc.querySelectorAll('image').forEach(svgImg => {
+      const ref = svgImg.getAttribute('xlink:href') || svgImg.getAttribute('href') || '';
+      if (!ref.startsWith('data:') && ref !== '' && book && book.cover) {
+        svgImg.setAttribute('xlink:href', book.cover);
+        svgImg.setAttribute('href', book.cover);
+      }
+    });
+  }
+
+  // Track reading time
+  if (pageStartTime) {
+    const elapsed = (Date.now() - pageStartTime) / 1000 / 60; // minutes
+    if (elapsed > 0.1 && elapsed < 30) {
+      const book = APP.currentBook;
+      if (!APP.readingStats[book.id]) APP.readingStats[book.id] = [];
+      APP.readingStats[book.id].push(elapsed);
+      // Keep last 50 measurements
+      if (APP.readingStats[book.id].length > 50) APP.readingStats[book.id].shift();
+
+      // Update avg time per page
+      const times = APP.readingStats[book.id];
+      book.timePerPage = times.reduce((a, b) => a + b, 0) / times.length;
+      saveState();
+    }
+  }
+  pageStartTime = Date.now();
+}
+
+function nextPage() {
+  if (!APP.currentBook) return;
+  if (APP.currentBook.currentPage >= allPages.length - 1) {
+    showNotification('Fim do livro');
+    return;
+  }
+
+  einkFlash(() => {
+    APP.currentBook.currentPage++;
+    renderPage(APP.currentBook.currentPage);
+    updateReaderFooter();
+    saveBookProgress();
+  });
+}
+
+function prevPage() {
+  if (!APP.currentBook) return;
+  if (APP.currentBook.currentPage <= 0) return;
+
+  einkFlash(() => {
+    APP.currentBook.currentPage--;
+    renderPage(APP.currentBook.currentPage);
+    updateReaderFooter();
+    saveBookProgress();
+  });
+}
+
+function saveBookProgress() {
+  if (!APP.currentBook) return;
+  const book = APP.books.find(b => b.id === APP.currentBook.id);
+  if (book) {
+    book.currentPage = APP.currentBook.currentPage;
+    book.totalPages = APP.currentBook.totalPages;
+    book.timePerPage = APP.currentBook.timePerPage;
+    saveBookToDB(book);
+  }
+  saveState();
+  renderLibrary();
+}
+
+function updateReaderFooter() {
+  const book = APP.currentBook;
+  if (!book) return;
+
+  const curr = book.currentPage + 1;
+  const total = allPages.length;
+  document.getElementById('readerPageNum').textContent = `pág. ${curr} / ${total}`;
+
+  const pct = total > 0 ? (curr / total * 100) : 0;
+  document.getElementById('readerProgressFill').style.width = pct + '%';
+
+  // Chapter label
+  const pageData = allPages[book.currentPage];
+  if (pageData && book.toc && book.toc.length > 0) {
+    const chIdx = pageData.chapterIndex;
+    const chapter = book.toc.slice().reverse().find(t => t.spineIndex <= chIdx);
+    document.getElementById('readerChapterLabel').textContent = chapter ? chapter.label : '';
+  }
+
+  // Time estimate
+  const pagesLeft = total - curr;
+  if (book.timePerPage > 0 && pagesLeft > 0) {
+    const minsLeft = Math.round(pagesLeft * book.timePerPage);
+    const h = Math.floor(minsLeft / 60);
+    const m = minsLeft % 60;
+    const label = h > 0 ? `~${h}h ${m}min restantes` : `~${m} min restantes`;
+    document.getElementById('readerTimeLeft').textContent = label;
+  } else {
+    document.getElementById('readerTimeLeft').textContent = 'calculando...';
+  }
+}
+
+function toggleReaderUI() {
+  APP.readerUIVisible = !APP.readerUIVisible;
+  document.getElementById('readerHeader').classList.toggle('hidden', !APP.readerUIVisible);
+  document.getElementById('readerFooter').classList.toggle('hidden', !APP.readerUIVisible);
+}
+
+function closeReader() {
+  saveBookProgress();
+  einkFlash(() => {
+    showScreen('screen-library');
+    renderLibrary();
+  });
+}
+
+// ============================================================
+// TOC
+// ============================================================
+function renderTOC(book) {
+  const list = document.getElementById('tocList');
+  list.innerHTML = '';
+
+  if (!book.toc || book.toc.length === 0) {
+    list.innerHTML = '<div style="padding:20px;font-size:11px;color:var(--ink-faint)">Índice não disponível</div>';
+    return;
+  }
+
+  book.toc.forEach((entry, idx) => {
+    const item = document.createElement('div');
+    item.className = 'toc-item';
+    item.innerHTML = `
+      <span class="toc-item-num">${String(idx + 1).padStart(2, '0')}</span>
+      <span class="toc-item-title">${entry.label}</span>
+    `;
+    item.addEventListener('click', () => {
+      // Jump to first page of that spine index
+      const targetSpineIdx = entry.spineIndex;
+      const pageIdx = allPages.findIndex(p => p.chapterIndex >= targetSpineIdx);
+      if (pageIdx >= 0) {
+        einkFlash(() => {
+          APP.currentBook.currentPage = pageIdx;
+          renderPage(pageIdx);
+          updateReaderFooter();
+          saveBookProgress();
+          closeTOC();
+        });
+      } else {
+        closeTOC();
+      }
+    });
+    list.appendChild(item);
+  });
+}
+
+function showTOC() {
+  document.getElementById('tocOverlay').classList.add('open');
+}
+
+function closeTOC() {
+  document.getElementById('tocOverlay').classList.remove('open');
+}
+
+function closeTOCOutside(e) {
+  if (e.target === document.getElementById('tocOverlay')) closeTOC();
+}
+
+// ============================================================
+// BOOK CONTEXT MENU
+// ============================================================
+function showBookMenu(e, bookId) {
+  APP.contextMenuBook = bookId;
+  const menu = document.getElementById('bookMenu');
+  menu.classList.add('open');
+  const x = Math.min(e.clientX || e.pageX, window.innerWidth - 180);
+  const y = Math.min(e.clientY || e.pageY, window.innerHeight - 100);
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  setTimeout(() => document.addEventListener('click', closeBookMenu, { once: true }), 50);
+}
+
+function closeBookMenu() {
+  document.getElementById('bookMenu').classList.remove('open');
+}
+
+function openBookFromMenu() {
+  closeBookMenu();
+  if (APP.contextMenuBook) openBook(APP.contextMenuBook);
+}
+
+function deleteBookFromMenu() {
+  closeBookMenu();
+  const id = APP.contextMenuBook;
+  if (!id) return; // guard: nothing selected
+
+  confirm2('Remover Livro', 'Este livro será removido da biblioteca. O arquivo original não será afetado.', () => {
+    // 1. Remove from DOM immediately — instant visual feedback
+    const card = document.querySelector(`[data-id="${id}"]`);
+    if (card) card.remove();
+
+    // 2. Remove from in-memory array
+    APP.books = APP.books.filter(b => String(b.id) !== String(id));
+
+    // 3. Re-render library right away (doesn't wait for DB)
+    renderLibrary();
+    showNotification('Livro removido');
+    saveState();
+
+    // 4. Delete from IndexedDB in background
+    deleteBookFromDB(id).catch(() => {});
+
+    APP.contextMenuBook = null;
+  });
+}
+
+// ============================================================
+// ADMIN
+// ============================================================
+function showAdmin() {
+  einkFlash(() => showScreen('screen-admin'));
+  renderAdminUsers();
+  renderAdminStats();
+}
+
+function closeAdmin() {
+  einkFlash(() => showScreen('screen-library'));
+}
+
+function switchAdminTab(tab) {
+  document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.admin-tab-content').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+function renderAdminUsers() {
+  const tbody = document.getElementById('usersTableBody');
+  tbody.innerHTML = '';
+  const users = getUsers();
+
+  users.forEach(u => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-size:10px">${u.email}</td>
+      <td><span style="font-size:9px;letter-spacing:0.1em;text-transform:uppercase">${u.role === 'admin' ? 'Admin' : 'Usuário'}</span></td>
+      <td><span class="user-status ${u.status === 'blocked' ? 'blocked' : ''}">${statusLabel(u.status)}</span></td>
+      <td>
+        <div class="user-actions">
+          ${u.email !== 'admin@inkwell.com' ? `
+            ${u.status === 'pending' ? `<button class="btn-small" onclick="approveUser('${u.id}')">Aprovar</button>` : ''}
+            <button class="btn-small" onclick="openEditUser('${u.id}')">Editar</button>
+            ${u.status !== 'blocked' ? `<button class="btn-small" onclick="blockUser('${u.id}')">Bloquear</button>` : `<button class="btn-small" onclick="unblockUser('${u.id}')">Desbloquear</button>`}
+            <button class="btn-small danger" onclick="deleteUser('${u.id}')">✕</button>
+          ` : '<span style="font-size:9px;color:var(--ink-faint)">Protegido</span>'}
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function statusLabel(s) {
+  return { active: 'Ativo', blocked: 'Bloqueado', pending: 'Pendente' }[s] || s;
+}
+
+function approveUser(id) {
+  let users = getUsers();
+  users = users.map(u => u.id === id ? { ...u, status: 'active' } : u);
+  saveUsers(users);
+  renderAdminUsers();
+  showNotification('Usuário aprovado');
+}
+
+function blockUser(id) {
+  let users = getUsers();
+  users = users.map(u => u.id === id ? { ...u, status: 'blocked' } : u);
+  saveUsers(users);
+  renderAdminUsers();
+  showNotification('Usuário bloqueado');
+}
+
+function unblockUser(id) {
+  let users = getUsers();
+  users = users.map(u => u.id === id ? { ...u, status: 'active' } : u);
+  saveUsers(users);
+  renderAdminUsers();
+  showNotification('Usuário desbloqueado');
+}
+
+function deleteUser(id) {
+  confirm2('Deletar Usuário', 'Esta ação não pode ser desfeita.', () => {
+    let users = getUsers().filter(u => u.id !== id);
+    saveUsers(users);
+    renderAdminUsers();
+    showNotification('Usuário removido');
+  });
+}
+
+function createUser() {
+  const email = document.getElementById('newUserEmail').value.trim();
+  const pass = document.getElementById('newUserPassword').value;
+  const role = document.getElementById('newUserRole').value;
+
+  if (!email || pass.length < 6) {
+    showNotification('Preencha e-mail e senha (mín. 6)');
+    return;
+  }
+
+  let users = getUsers();
+  if (users.find(u => u.email === email)) {
+    showNotification('E-mail já existe');
+    return;
+  }
+
+  users.push({
+    id: 'u_' + Date.now(),
+    email, password: pass, role,
+    status: 'active',
+    created: new Date().toISOString()
+  });
+  saveUsers(users);
+  document.getElementById('newUserEmail').value = '';
+  document.getElementById('newUserPassword').value = '';
+  renderAdminUsers();
+  showNotification('Usuário criado');
+}
+
+function openEditUser(id) {
+  const users = getUsers();
+  const u = users.find(u => u.id === id);
+  if (!u) return;
+  document.getElementById('editUserId').value = id;
+  document.getElementById('editUserEmail').value = u.email;
+  document.getElementById('editUserPassword').value = '';
+  document.getElementById('editUserRole').value = u.role;
+  document.getElementById('editUserOverlay').classList.add('open');
+}
+
+function closeEditUser() {
+  document.getElementById('editUserOverlay').classList.remove('open');
+}
+
+function closeEditUserOutside(e) {
+  if (e.target === document.getElementById('editUserOverlay')) closeEditUser();
+}
+
+function saveEditUser() {
+  const id    = document.getElementById('editUserId').value;
+  const email = document.getElementById('editUserEmail').value.trim();
+  const pass  = document.getElementById('editUserPassword').value;
+  const role  = document.getElementById('editUserRole').value;
+
+  if (!email) { showNotification('E-mail não pode ser vazio'); return; }
+  if (pass && pass.length < 6) { showNotification('Senha deve ter mínimo 6 caracteres'); return; }
+
+  let users = getUsers();
+  const conflict = users.find(u => u.email === email && u.id !== id);
+  if (conflict) { showNotification('Este e-mail já está em uso'); return; }
+
+  users = users.map(u => {
+    if (u.id !== id) return u;
+    return { ...u, email, role, ...(pass ? { password: pass } : {}) };
+  });
+  saveUsers(users);
+  closeEditUser();
+  renderAdminUsers();
+  showNotification('Usuário atualizado');
+}
+
+function renderAdminStats() {
+  const users = getUsers();
+  const grid = document.getElementById('statsGrid');
+  grid.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-value">${users.length}</div>
+      <div class="stat-label">Usuários</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${users.filter(u=>u.status==='active').length}</div>
+      <div class="stat-label">Ativos</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${users.filter(u=>u.status==='pending').length}</div>
+      <div class="stat-label">Pendentes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${APP.books.length}</div>
+      <div class="stat-label">Livros</div>
+    </div>
+  `;
+}
+
+// ============================================================
+// MODALS / CONFIRM
+// ============================================================
+function confirm2(title, text, cb) {
+  APP.confirmCallback = cb;
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmText').textContent = text;
+  document.getElementById('confirmModal').classList.add('open');
+}
+
+function closeConfirm() {
+  document.getElementById('confirmModal').classList.remove('open');
+  APP.confirmCallback = null;
+}
+
+function runConfirm() {
+  const cb = APP.confirmCallback; // salva referência ANTES de limpar
+  closeConfirm();                 // isso zera APP.confirmCallback = null
+  if (cb) cb();                   // executa o callback salvo
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+let notifTimer;
+
+function showNotification(msg) {
+  const el = document.getElementById('notification');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(notifTimer);
+  notifTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ============================================================
+// KEYBOARD SHORTCUTS
+// ============================================================
+document.addEventListener('keydown', e => {
+  const activeScreen = document.querySelector('.screen.active');
+  if (!activeScreen) return;
+
+  if (activeScreen.id === 'screen-reader') {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+      e.preventDefault();
+      nextPage();
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      prevPage();
+    } else if (e.key === 'Escape') {
+      closeReader();
+    }
+  }
+});
+
+// ============================================================
+// SWIPE SUPPORT
+// ============================================================
+let touchStartX = 0;
+let touchStartY = 0;
+
+document.getElementById('readerBody').addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+}, { passive: true });
+
+document.getElementById('readerBody').addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+    if (dx < 0) nextPage();
+    else prevPage();
+  }
+}, { passive: true });
+
+// ============================================================
+// SERVICE WORKER (offline)
+// ============================================================
+if ('serviceWorker' in navigator) {
+  const swCode = `
+const CACHE = 'inkwell-v1';
+const ASSETS = [
+  '${window.location.href}',
+  'https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Space+Mono:wght@400;700&display=swap',
+  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+];
+
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS).catch(()=>{})));
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys =>
+    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+  ));
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', e => {
+  e.respondWith(
+    caches.match(e.request).then(cached => cached || fetch(e.request).then(resp => {
+      if (resp && resp.status === 200 && resp.type === 'basic') {
+        const clone = resp.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+      }
+      return resp;
+    }).catch(() => cached))
+  );
+});
+  `;
+
+  const blob = new Blob([swCode], { type: 'application/javascript' });
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl).catch(() => {});
+}
+
+// ============================================================
+// INIT
+// ============================================================
+window.addEventListener('beforeunload', () => {
+  saveBookProgress();
+  saveState();
+});
+
+// Apply theme on start
+document.documentElement.setAttribute('data-theme', APP.settings.theme || 'light');
+</script>
+</body>
+</html>
