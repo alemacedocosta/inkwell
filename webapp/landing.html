@@ -979,6 +979,7 @@ footer {
   transform: translateY(0);
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
@@ -1388,21 +1389,52 @@ function switchTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
 }
 
+// ===== SUPABASE =====
+const SUPABASE_URL = 'https://xuhcvqpmwigeuqmfyqjj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh1aGN2cXBtd2lnZXVxbWZ5cWpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NjQ5NjUsImV4cCI6MjA5MDQ0MDk2NX0.odkc-I4Iwv9Qs2Cs8rvqYO6sJg7FQTor3XuR44XGxPk';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 // ===== AUTH ACTIONS =====
-function doLogin() {
+async function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const pass = document.getElementById('login-pass').value;
   const msg = document.getElementById('login-msg');
   if (!email || !pass) { msg.textContent = '↳ Preencha e-mail e senha.'; msg.className='field-msg error'; return; }
   msg.textContent = '↳ Verificando...'; msg.className='field-msg';
-  setTimeout(() => {
-    msg.textContent = '↳ Redirecionando para o app...';
-    // Salva credenciais para auto-login no app
+  try {
+    const { data, error } = await sb.from('inkwell_users')
+      .select('*').eq('email', email).eq('password', pass).maybeSingle();
+    if (error) throw error;
+    if (!data) { msg.textContent = '↳ E-mail ou senha incorretos.'; msg.className='field-msg error'; return; }
+    if (data.status === 'blocked') { msg.textContent = '↳ Conta bloqueada. Contate o suporte.'; msg.className='field-msg error'; return; }
+    // Salva usuário no localStorage para fallback offline
+    try {
+      let users = JSON.parse(localStorage.getItem('inkwell_users') || '[]');
+      const idx = users.findIndex(u => u.email === email);
+      if (idx >= 0) users[idx] = data; else users.push(data);
+      localStorage.setItem('inkwell_users', JSON.stringify(users));
+    } catch(_) {}
+    // Sinaliza sessão válida para o app
     localStorage.setItem('inkwell_pending_session', JSON.stringify({ email, pass }));
-    setTimeout(() => { window.location.href = '/app'; }, 800);
-  }, 900);
+    msg.textContent = '↳ Entrando na biblioteca...'; msg.className='field-msg success';
+    setTimeout(() => { window.location.href = '/app'; }, 700);
+  } catch(e) {
+    // Fallback offline: tenta localStorage
+    try {
+      const users = JSON.parse(localStorage.getItem('inkwell_users') || '[]');
+      const user = users.find(u => u.email === email && u.password === pass && u.status !== 'blocked');
+      if (user) {
+        localStorage.setItem('inkwell_pending_session', JSON.stringify({ email, pass }));
+        msg.textContent = '↳ Entrando (modo offline)...'; msg.className='field-msg success';
+        setTimeout(() => { window.location.href = '/app'; }, 700);
+      } else {
+        msg.textContent = '↳ E-mail ou senha incorretos.'; msg.className='field-msg error';
+      }
+    } catch(_) { msg.textContent = '↳ Erro de conexão. Tente novamente.'; msg.className='field-msg error'; }
+  }
 }
-function doRegister() {
+
+async function doRegister() {
   const name = document.getElementById('reg-name').value.trim();
   const email = document.getElementById('reg-email').value.trim();
   const pass = document.getElementById('reg-pass').value;
@@ -1410,20 +1442,20 @@ function doRegister() {
   if (!name || !email || !pass) { msg.textContent = '↳ Preencha todos os campos.'; msg.className='field-msg error'; return; }
   if (pass.length < 6) { msg.textContent = '↳ Senha deve ter ao menos 6 caracteres.'; msg.className='field-msg error'; return; }
   msg.textContent = '↳ Criando sua conta...'; msg.className='field-msg';
-  // Registra o usuário localmente para compatibilidade offline
+  const newUser = { id: 'u_' + Date.now(), name, email, password: pass, role: 'user', status: 'active', created: new Date().toISOString() };
+  try {
+    const { error } = await sb.from('inkwell_users').insert(newUser);
+    if (error && !error.message.includes('duplicate')) throw error;
+  } catch(_) {}
+  // Sempre salva localmente também
   try {
     let users = JSON.parse(localStorage.getItem('inkwell_users') || '[]');
-    if (!users.find(u => u.email === email)) {
-      users.push({ id: 'u_' + Date.now(), name, email, password: pass, role: 'user', status: 'active', created: new Date().toISOString() });
-      localStorage.setItem('inkwell_users', JSON.stringify(users));
-    }
+    if (!users.find(u => u.email === email)) users.push(newUser);
+    localStorage.setItem('inkwell_users', JSON.stringify(users));
   } catch(_) {}
-  // Salva credenciais para auto-login no app
   localStorage.setItem('inkwell_pending_session', JSON.stringify({ email, pass }));
-  setTimeout(() => {
-    msg.textContent = '↳ Conta criada! Redirecionando...'; msg.className='field-msg success';
-    setTimeout(() => { window.location.href = '/app'; }, 1000);
-  }, 1200);
+  msg.textContent = '↳ Conta criada! Abrindo biblioteca...'; msg.className='field-msg success';
+  setTimeout(() => { window.location.href = '/app'; }, 900);
 }
 
 // ===== SMOOTH SCROLL =====
