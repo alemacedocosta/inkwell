@@ -1259,14 +1259,16 @@ input[type="file"] { display: none; }
       </div>
       <button class="btn-primary" onclick="doLogin()">Entrar</button>
       <div class="login-error" id="loginError"></div>
-      <div class="login-register-link" onclick="showRegisterModal()">Criar conta · R$29,00 acesso vitalício</div>
+      <div class="login-register-link" onclick="showRegisterModal()">Criar conta · R$7,00/mês</div>
     </div>
 
     <div class="login-price">
       <span>Acesso completo à plataforma</span>
-      <strong>R$ 29,00</strong>
-      <span>pagamento único · vitalício</span>
+      <strong>R$ 7,00</strong>
+      <span>por mês · cancele quando quiser</span>
     </div>
+
+    <a href="/" style="display:block; margin-top:24px; text-align:center; font-size:9px; letter-spacing:0.15em; text-transform:uppercase; color:var(--ink-faint); text-decoration:none; transition:color 0.15s steps(3,end);" onmouseover="this.style.color='var(--ink)'" onmouseout="this.style.color='var(--ink-faint)'">← Saiba mais sobre o Inkwell</a>
   </div>
 </div>
 
@@ -1533,7 +1535,7 @@ input[type="file"] { display: none; }
 <div class="modal-overlay" id="registerModal">
   <div class="modal">
     <div class="modal-title">Criar Conta</div>
-    <div class="modal-text">Acesso vitalício por R$29,00. Após o cadastro, sua conta ficará pendente de aprovação pelo administrador.</div>
+    <div class="modal-text">Assinatura mensal por R$7,00/mês. Cancele quando quiser.</div>
     <div class="field-group">
       <label class="field-label">E-mail</label>
       <input class="field-input" type="email" id="regEmail" placeholder="seu@email.com">
@@ -1542,7 +1544,7 @@ input[type="file"] { display: none; }
       <label class="field-label">Senha</label>
       <input class="field-input" type="password" id="regPassword" placeholder="Mínimo 6 caracteres">
     </div>
-    <div class="register-note">Após o registro, aguarde a aprovação do administrador para acessar a plataforma.</div>
+    <div class="register-note">Acesso imediato após o cadastro.</div>
     <div class="modal-actions" style="margin-top:24px">
       <button class="btn-secondary" onclick="closeRegisterModal()">Cancelar</button>
       <button class="btn-primary" style="flex:1" onclick="doRegister()">Criar Conta</button>
@@ -1678,12 +1680,13 @@ window.addEventListener('load', async () => {
       localStorage.removeItem('inkwell_pending_session');
       try {
         const { email, pass } = JSON.parse(pending);
-        // Tenta Supabase primeiro
         let loggedIn = false;
+
+        // Tenta Supabase primeiro
         try {
           const { data, error } = await sb.from('inkwell_users')
             .select('*').eq('email', email).eq('password', pass).maybeSingle();
-          if (!error && data && data.status === 'active') {
+          if (!error && data && data.status !== 'blocked') {
             APP.currentUser = data;
             await syncBooksFromCloud();
             await loadProgressFromCloud();
@@ -1693,7 +1696,8 @@ window.addEventListener('load', async () => {
             loggedIn = true;
           }
         } catch(_) {}
-        // Fallback offline
+
+        // Fallback: localStorage (cobre offline e usuários criados na LP)
         if (!loggedIn) {
           const users = JSON.parse(localStorage.getItem('inkwell_users') || '[]');
           const user = users.find(u => u.email === email && u.password === pass && u.status !== 'blocked');
@@ -1705,7 +1709,14 @@ window.addEventListener('load', async () => {
             loggedIn = true;
           }
         }
-        if (!loggedIn) showScreen('screen-login');
+
+        // Último recurso: pré-preenche o form de login com as credenciais
+        if (!loggedIn) {
+          document.getElementById('loginEmail').value = email;
+          document.getElementById('loginPassword').value = pass;
+          document.getElementById('loginError').textContent = 'Confirme suas credenciais.';
+          showScreen('screen-login');
+        }
       } catch(_) { showScreen('screen-login'); }
     } else {
       showScreen('screen-login');
