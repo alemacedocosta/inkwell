@@ -1658,6 +1658,7 @@ window.addEventListener('load', async () => {
             .select('*').eq('email', email).eq('password', pass).maybeSingle();
           if (!error && data && data.status !== 'blocked') {
             APP.currentUser = data;
+            filterBooksForUser();
             await syncBooksFromCloud();
             await loadProgressFromCloud();
             document.getElementById('adminBtn').style.display = data.role === 'admin' ? '' : 'none';
@@ -1673,6 +1674,7 @@ window.addEventListener('load', async () => {
           const user = users.find(u => u.email === email && u.password === pass && u.status !== 'blocked');
           if (user) {
             APP.currentUser = user;
+            filterBooksForUser();
             document.getElementById('adminBtn').style.display = user.role === 'admin' ? '' : 'none';
             renderLibrary();
             einkFlash(() => showScreen('screen-library'));
@@ -1748,6 +1750,7 @@ async function loadBooksFromIndexedDB() {
       const raw = req.result || [];
       APP.books = raw.map(b => ({
         id: b.id,
+        userId: b.userId || null,
         title: b.title,
         author: b.author,
         cover: b.cover,
@@ -1869,6 +1872,13 @@ async function doLogin() {
       renderLibrary();
     } catch(_) { errEl.textContent = 'Erro de conexão. Tente novamente.'; }
   }
+}
+
+function filterBooksForUser() {
+  if (!APP.currentUser) return;
+  const uid = APP.currentUser.id || APP.currentUser.email;
+  // Mostra: livros do usuário atual + livros sem userId (legados, importados antes dessa correção)
+  APP.books = APP.books.filter(b => !b.userId || b.userId === uid);
 }
 
 function doLogout() {
@@ -2252,6 +2262,7 @@ async function processEpubFile(file, forceBookId) {
 
     const bookData = {
       id: bookId,
+      userId: APP.currentUser?.id || APP.currentUser?.email || null,
       title,
       author: creator,
       cover: coverDataUrl,
