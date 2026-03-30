@@ -1,0 +1,1491 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#f5f0e8">
+<meta name="description" content="Inkwell — Seu leitor de e-books elegante, offline e acessível. Leitura no estilo Kindle diretamente no seu navegador.">
+<title>Inkwell — Leitor de E-books</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --ink: #1a1a18;
+  --paper: #f5f0e8;
+  --paper-mid: #e8e2d4;
+  --paper-dark: #d4cdbf;
+  --ink-light: #4a4a44;
+  --ink-faint: #8a8a7a;
+  --font-body: 'EB Garamond', serif;
+  --font-ui: 'Space Mono', monospace;
+  --transition-eink: all 0.15s steps(3, end);
+  --transition-eink-slow: all 0.4s steps(8, end);
+}
+
+[data-theme="dark"] {
+  --ink: #e8e4dc;
+  --paper: #141410;
+  --paper-mid: #1e1e1a;
+  --paper-dark: #2a2a24;
+  --ink-light: #b8b4ac;
+  --ink-faint: #6a6a60;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-ui);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  overflow-x: hidden;
+  transition: background 0.4s steps(8, end), color 0.4s steps(8, end);
+}
+
+/* Paper texture overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='none'/%3E%3Crect x='0' y='0' width='1' height='1' fill='rgba(0,0,0,0.025)'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ===== MODAL ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26,26,24,0.8);
+  z-index: 8000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+
+.modal {
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  width: 100%;
+  max-width: 400px;
+  padding: 48px 40px;
+  position: relative;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid var(--ink);
+  pointer-events: none;
+  opacity: 0.25;
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px; right: 16px;
+  background: none;
+  border: none;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.modal-close:hover { color: var(--ink); }
+
+.modal-logo {
+  font-family: var(--font-body);
+  font-size: 40px;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.modal-tagline {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 36px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--paper-dark);
+}
+
+.modal-tabs {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+.modal-tab {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  cursor: pointer;
+  padding-bottom: 6px;
+  border-bottom: 2px solid transparent;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  font-family: var(--font-ui);
+  transition: var(--transition-eink);
+}
+.modal-tab.active {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+.field-group { margin-bottom: 20px; }
+.field-label {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+.field-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ink);
+  padding: 8px 0;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--ink);
+  outline: none;
+  transition: var(--transition-eink);
+}
+.field-input::placeholder { color: var(--ink-faint); }
+.field-input:focus { border-bottom-width: 2px; }
+
+.btn-primary {
+  width: 100%;
+  padding: 14px;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-top: 28px;
+  transition: var(--transition-eink);
+}
+.btn-primary:hover { opacity: 0.85; }
+.btn-primary:active { opacity: 0.6; }
+
+.modal-price-note {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--paper-dark);
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+.modal-price-note strong {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 26px;
+  color: var(--ink);
+  letter-spacing: 0;
+  font-weight: 400;
+  margin: 6px 0 2px;
+}
+
+.field-msg {
+  font-size: 10px;
+  margin-top: 10px;
+  text-align: center;
+  min-height: 14px;
+  letter-spacing: 0.05em;
+}
+.field-msg.error { color: var(--ink); opacity: 0.7; }
+.field-msg.success { color: var(--ink); }
+
+/* ===== NAVBAR ===== */
+.navbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 48px;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.3s, background 0.3s, padding 0.3s;
+}
+.navbar.scrolled {
+  background: var(--paper);
+  border-bottom-color: var(--paper-dark);
+  padding: 14px 48px;
+}
+
+.nav-logo {
+  font-family: var(--font-body);
+  font-size: 28px;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.nav-link {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: var(--font-ui);
+  transition: var(--transition-eink);
+}
+.nav-link:hover { color: var(--ink); }
+
+.nav-btn-login {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--paper);
+  background: var(--ink);
+  border: none;
+  font-family: var(--font-ui);
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: var(--transition-eink);
+}
+.nav-btn-login:hover { opacity: 0.8; }
+
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--ink-faint);
+  font-family: var(--font-ui);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  padding: 7px 12px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: var(--transition-eink);
+}
+.theme-toggle:hover { border-color: var(--ink); color: var(--ink); }
+
+/* ===== HERO ===== */
+.hero {
+  position: relative;
+  height: 100vh;
+  min-height: 600px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-bottom: 1px solid var(--paper-dark);
+}
+
+.hero-parallax-bg {
+  position: absolute;
+  inset: -15%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  opacity: 0.06;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.hero-book-spine {
+  border-right: 1px solid var(--ink);
+  height: 100%;
+}
+.hero-book-spine:nth-child(2) { opacity: 0.6; }
+.hero-book-spine:nth-child(3) { opacity: 0.8; }
+
+.hero-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.04;
+  will-change: transform;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  padding: 0 24px;
+  max-width: 800px;
+}
+
+.hero-eyebrow {
+  font-size: 9px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 24px;
+}
+
+.hero-title {
+  font-family: var(--font-body);
+  font-size: clamp(64px, 10vw, 120px);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 0.9;
+  margin-bottom: 32px;
+  color: var(--ink);
+}
+
+.hero-subtitle {
+  font-family: var(--font-body);
+  font-size: clamp(16px, 2.5vw, 22px);
+  font-weight: 400;
+  color: var(--ink-light);
+  line-height: 1.6;
+  max-width: 480px;
+  margin: 0 auto 48px;
+}
+
+.hero-cta-group {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-hero-primary {
+  padding: 16px 40px;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: var(--transition-eink);
+}
+.btn-hero-primary:hover { opacity: 0.8; }
+
+.btn-hero-secondary {
+  padding: 16px 40px;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  transition: var(--transition-eink);
+}
+.btn-hero-secondary:hover { background: var(--ink); color: var(--paper); }
+
+.hero-scroll-indicator {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-faint);
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.scroll-line {
+  width: 1px;
+  height: 40px;
+  background: var(--ink-faint);
+  animation: scroll-pulse 2s steps(8, end) infinite;
+}
+@keyframes scroll-pulse {
+  0%, 100% { opacity: 0.3; height: 20px; }
+  50% { opacity: 1; height: 40px; }
+}
+
+/* ===== DEVICE MOCKUP ===== */
+.hero-device {
+  position: absolute;
+  right: 8%;
+  bottom: 0;
+  width: 280px;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s, transform 0.6s;
+  will-change: transform;
+}
+.hero-device.visible {
+  opacity: 0.12;
+  transform: translateY(0);
+}
+
+.device-frame {
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  padding: 20px 16px;
+  height: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--paper);
+  box-shadow: 6px 6px 0 var(--paper-dark);
+}
+.device-line {
+  height: 1px;
+  background: var(--ink);
+  width: 100%;
+}
+.device-line:nth-child(odd) { width: 90%; }
+.device-line:nth-child(3n) { width: 70%; }
+.device-line:nth-child(5n) { width: 85%; }
+.device-line.short { width: 45%; }
+
+/* ===== SECTION BASE ===== */
+section {
+  padding: 120px 48px;
+  border-bottom: 1px solid var(--paper-dark);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.section-full {
+  max-width: none;
+  padding: 120px 0;
+  margin: 0;
+  border-bottom: 1px solid var(--paper-dark);
+}
+.section-full .section-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 48px;
+}
+
+.section-eyebrow {
+  font-size: 9px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 20px;
+}
+
+.section-title {
+  font-family: var(--font-body);
+  font-size: clamp(36px, 5vw, 64px);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  margin-bottom: 24px;
+  color: var(--ink);
+}
+
+.section-body {
+  font-family: var(--font-body);
+  font-size: clamp(17px, 1.5vw, 20px);
+  line-height: 1.7;
+  color: var(--ink-light);
+  max-width: 540px;
+}
+
+/* Divider ornament */
+.ornament {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 64px;
+}
+.ornament-line { flex: 1; height: 1px; background: var(--paper-dark); }
+.ornament-mark {
+  font-family: var(--font-body);
+  font-size: 20px;
+  font-style: italic;
+  color: var(--ink-faint);
+}
+
+/* ===== FEATURES ===== */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1px;
+  background: var(--paper-dark);
+  border: 1px solid var(--paper-dark);
+  margin-top: 80px;
+}
+
+.feature-card {
+  background: var(--paper);
+  padding: 48px 40px;
+  transition: var(--transition-eink);
+  position: relative;
+}
+.feature-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 40px; right: 40px;
+  height: 1px;
+  background: transparent;
+  transition: var(--transition-eink);
+}
+.feature-card:hover::after {
+  background: var(--ink);
+}
+
+.feature-number {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  margin-bottom: 24px;
+}
+
+.feature-icon-line {
+  width: 40px;
+  height: 1px;
+  background: var(--ink);
+  margin-bottom: 20px;
+  transition: width 0.3s steps(6, end);
+}
+.feature-card:hover .feature-icon-line { width: 64px; }
+
+.feature-title {
+  font-family: var(--font-body);
+  font-size: 24px;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.2;
+  margin-bottom: 16px;
+  color: var(--ink);
+}
+
+.feature-desc {
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--ink-light);
+}
+
+/* ===== HOW IT WORKS ===== */
+.how-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .how-layout { grid-template-columns: 1fr; gap: 48px; }
+}
+
+.steps-list {
+  margin-top: 20px;
+  list-style: none;
+}
+
+.step-item {
+  display: flex;
+  gap: 24px;
+  padding: 32px 0;
+  border-top: 1px solid var(--paper-dark);
+}
+.step-item:last-child { border-bottom: 1px solid var(--paper-dark); }
+
+.step-num {
+  font-family: var(--font-body);
+  font-size: 48px;
+  font-style: italic;
+  color: var(--paper-dark);
+  line-height: 1;
+  min-width: 48px;
+  transition: color 0.3s steps(6,end);
+}
+.step-item:hover .step-num { color: var(--ink); }
+
+.step-content {}
+.step-title {
+  font-family: var(--font-body);
+  font-size: 20px;
+  font-style: italic;
+  margin-bottom: 8px;
+  color: var(--ink);
+}
+.step-desc {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink-light);
+}
+
+/* Simulated e-reader */
+.ereader-mockup {
+  border: 1.5px solid var(--ink);
+  padding: 0;
+  position: sticky;
+  top: 120px;
+  box-shadow: 6px 6px 0 var(--paper-dark), 12px 12px 0 rgba(0,0,0,0.05);
+}
+
+.ereader-bar {
+  border-bottom: 1px solid var(--paper-dark);
+  padding: 12px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ereader-bar-title {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-family: var(--font-ui);
+}
+.ereader-bar-pct {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-style: italic;
+  color: var(--ink-faint);
+}
+
+.ereader-page {
+  padding: 40px 36px 32px;
+  min-height: 340px;
+}
+.ereader-chapter {
+  font-size: 8px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-family: var(--font-ui);
+  margin-bottom: 24px;
+  text-align: center;
+}
+.ereader-text {
+  font-family: 'EB Garamond', serif;
+  font-size: 18px;
+  line-height: 1.75;
+  color: var(--ink);
+}
+.ereader-text p { margin-bottom: 16px; }
+.ereader-text p:last-child { margin-bottom: 0; }
+
+.ereader-nav {
+  border-top: 1px solid var(--paper-dark);
+  padding: 12px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-family: var(--font-ui);
+}
+
+/* ===== PARALLAX QUOTE SECTION ===== */
+.parallax-section {
+  position: relative;
+  overflow: hidden;
+  padding: 160px 48px;
+  border-bottom: 1px solid var(--paper-dark);
+  text-align: center;
+}
+
+.parallax-bg-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body);
+  font-size: clamp(100px, 18vw, 200px);
+  font-style: italic;
+  color: var(--ink);
+  opacity: 0.025;
+  white-space: nowrap;
+  will-change: transform;
+  pointer-events: none;
+  user-select: none;
+}
+
+.parallax-quote {
+  position: relative;
+  z-index: 2;
+  font-family: var(--font-body);
+  font-size: clamp(24px, 4vw, 48px);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--ink);
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.parallax-attr {
+  margin-top: 32px;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* ===== PRICING ===== */
+.pricing-container {
+  max-width: 700px;
+  margin: 80px auto 0;
+}
+
+.pricing-card {
+  border: 1px solid var(--ink);
+  padding: 64px;
+  position: relative;
+  text-align: center;
+}
+.pricing-card::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border: 1px solid var(--ink);
+  pointer-events: none;
+  opacity: 0.2;
+}
+
+.pricing-badge {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 6px 20px;
+}
+
+.pricing-name {
+  font-family: var(--font-body);
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  font-style: italic;
+  margin-bottom: 8px;
+}
+
+.pricing-amount {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  margin: 24px 0;
+}
+.pricing-currency {
+  font-family: var(--font-body);
+  font-size: 28px;
+  font-style: italic;
+  margin-top: 12px;
+  color: var(--ink);
+}
+.pricing-value {
+  font-family: var(--font-body);
+  font-size: 88px;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--ink);
+  letter-spacing: -0.04em;
+}
+.pricing-cents {
+  font-family: var(--font-body);
+  font-size: 28px;
+  font-style: italic;
+  margin-top: 12px;
+  color: var(--ink);
+}
+.pricing-period {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 48px;
+}
+
+.pricing-features {
+  list-style: none;
+  margin-bottom: 48px;
+  text-align: left;
+}
+.pricing-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--paper-dark);
+  font-family: var(--font-body);
+  font-size: 18px;
+  color: var(--ink-light);
+  line-height: 1.4;
+}
+.pricing-feature:last-child { border-bottom: 1px solid var(--paper-dark); }
+.pricing-check {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  margin-top: 4px;
+  min-width: 20px;
+}
+
+.pricing-note {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-top: 24px;
+}
+
+/* ===== FAQ ===== */
+.faq-list {
+  margin-top: 64px;
+  max-width: 680px;
+}
+
+.faq-item {
+  border-top: 1px solid var(--paper-dark);
+  overflow: hidden;
+}
+.faq-item:last-child { border-bottom: 1px solid var(--paper-dark); }
+
+.faq-question {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 0;
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: 20px;
+  font-style: italic;
+  color: var(--ink);
+}
+.faq-toggle {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  color: var(--ink-faint);
+  transition: transform 0.2s steps(4, end);
+  min-width: 20px;
+  text-align: right;
+}
+.faq-item.open .faq-toggle { transform: rotate(45deg); }
+
+.faq-answer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s steps(8, end), padding 0.3s;
+  font-family: var(--font-body);
+  font-size: 18px;
+  line-height: 1.7;
+  color: var(--ink-light);
+}
+.faq-item.open .faq-answer { max-height: 300px; padding-bottom: 24px; }
+
+/* ===== FOOTER ===== */
+footer {
+  padding: 80px 48px;
+  border-top: 1px solid var(--paper-dark);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.footer-logo {
+  font-family: var(--font-body);
+  font-size: 32px;
+  font-style: italic;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+
+.footer-meta {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  line-height: 2;
+  text-align: right;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .navbar { padding: 16px 24px; }
+  .navbar.scrolled { padding: 12px 24px; }
+  .nav-actions { gap: 16px; }
+  .nav-link:not(.nav-btn-login):not(.theme-toggle) { display: none; }
+  section { padding: 80px 24px; }
+  .hero-device { display: none; }
+  .pricing-card { padding: 40px 24px; }
+  footer { padding: 48px 24px; }
+  footer .footer-meta { text-align: left; }
+  .modal { padding: 32px 24px; }
+  .parallax-section { padding: 100px 24px; }
+}
+
+@media (max-width: 480px) {
+  .features-grid { grid-template-columns: 1fr; }
+  .hero-title { font-size: 64px; }
+}
+
+/* ===== ANIMATE ON SCROLL ===== */
+.anim-fade-up {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s, transform 0.6s;
+}
+.anim-fade-up.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+</style>
+</head>
+<body>
+
+<!-- Modal overlay -->
+<div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">[ fechar ]</button>
+    <div class="modal-logo">Inkwell</div>
+    <div class="modal-tagline">Leitor de e-books</div>
+
+    <div class="modal-tabs">
+      <button class="modal-tab active" onclick="switchTab('login')">Entrar</button>
+      <button class="modal-tab" onclick="switchTab('register')">Criar conta</button>
+    </div>
+
+    <!-- Login tab -->
+    <div class="tab-pane active" id="tab-login">
+      <div class="field-group">
+        <label class="field-label" for="login-email">E-mail</label>
+        <input class="field-input" type="email" id="login-email" placeholder="seu@email.com" autocomplete="email">
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="login-pass">Senha</label>
+        <input class="field-input" type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn-primary" onclick="doLogin()">Entrar na biblioteca</button>
+      <div class="field-msg" id="login-msg"></div>
+    </div>
+
+    <!-- Register tab -->
+    <div class="tab-pane" id="tab-register">
+      <div class="field-group">
+        <label class="field-label" for="reg-name">Nome completo</label>
+        <input class="field-input" type="text" id="reg-name" placeholder="Seu nome" autocomplete="name">
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="reg-email">E-mail</label>
+        <input class="field-input" type="email" id="reg-email" placeholder="seu@email.com" autocomplete="email">
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="reg-pass">Senha</label>
+        <input class="field-input" type="password" id="reg-pass" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+      </div>
+      <button class="btn-primary" onclick="doRegister()">Começar por R$7/mês</button>
+      <div class="field-msg" id="reg-msg"></div>
+      <div class="modal-price-note">
+        Assinatura mensal<strong>R$ 7,00</strong>Cancele quando quiser
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Navbar -->
+<nav class="navbar" id="navbar">
+  <a href="#" class="nav-logo">Inkwell</a>
+  <div class="nav-actions">
+    <button class="nav-link" onclick="scrollTo('#features')">Recursos</button>
+    <button class="nav-link" onclick="scrollTo('#pricing')">Preço</button>
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">◐ Modo</button>
+    <button class="nav-btn-login" onclick="openModal('login')">Entrar</button>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero" id="hero">
+  <!-- Parallax background stripes -->
+  <div class="hero-parallax-bg" id="parallax-stripes">
+    <div class="hero-book-spine"></div>
+    <div class="hero-book-spine"></div>
+    <div class="hero-book-spine"></div>
+    <div class="hero-book-spine"></div>
+  </div>
+
+  <!-- Horizontal lines parallax layer -->
+  <svg class="hero-lines" id="parallax-lines" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <line x1="0" y1="100" x2="1440" y2="100" stroke="currentColor" stroke-width="0.5"/>
+    <line x1="0" y1="220" x2="1440" y2="220" stroke="currentColor" stroke-width="0.5"/>
+    <line x1="0" y1="340" x2="1440" y2="340" stroke="currentColor" stroke-width="0.5"/>
+    <line x1="0" y1="460" x2="1440" y2="460" stroke="currentColor" stroke-width="0.5"/>
+    <line x1="0" y1="580" x2="1440" y2="580" stroke="currentColor" stroke-width="0.5"/>
+    <line x1="0" y1="700" x2="1440" y2="700" stroke="currentColor" stroke-width="0.5"/>
+    <line x1="0" y1="820" x2="1440" y2="820" stroke="currentColor" stroke-width="0.5"/>
+    <line x1="360" y1="0" x2="360" y2="900" stroke="currentColor" stroke-width="0.5"/>
+    <line x1="720" y1="0" x2="720" y2="900" stroke="currentColor" stroke-width="0.5"/>
+    <line x1="1080" y1="0" x2="1080" y2="900" stroke="currentColor" stroke-width="0.5"/>
+  </svg>
+
+  <div class="hero-content">
+    <div class="hero-eyebrow">Leitor de e-books · Funciona offline · Estilo Kindle</div>
+    <h1 class="hero-title">Inkwell</h1>
+    <p class="hero-subtitle">Sua biblioteca pessoal no navegador. Leia seus EPUBs com a elegância de um e-reader profissional — em qualquer dispositivo, online ou offline.</p>
+    <div class="hero-cta-group">
+      <button class="btn-hero-primary" onclick="openModal('register')">Começar por R$7/mês</button>
+      <a href="#features" class="btn-hero-secondary">Ver recursos</a>
+    </div>
+  </div>
+
+  <!-- Device mockup -->
+  <div class="hero-device" id="hero-device">
+    <div class="device-frame">
+      <div class="device-line"></div>
+      <div class="device-line"></div>
+      <div class="device-line"></div>
+      <div class="device-line"></div>
+      <div class="device-line short"></div>
+      <div class="device-line"></div>
+      <div class="device-line"></div>
+      <div class="device-line"></div>
+      <div class="device-line"></div>
+      <div class="device-line short"></div>
+      <div class="device-line"></div>
+      <div class="device-line"></div>
+      <div class="device-line"></div>
+      <div class="device-line"></div>
+      <div class="device-line"></div>
+      <div class="device-line short"></div>
+      <div class="device-line"></div>
+      <div class="device-line"></div>
+      <div class="device-line"></div>
+      <div class="device-line"></div>
+      <div class="device-line short"></div>
+    </div>
+  </div>
+
+  <div class="hero-scroll-indicator">
+    <div class="scroll-line"></div>
+    <span>Rolar</span>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <div class="section-eyebrow">Recursos</div>
+  <h2 class="section-title">Tudo que você<br>precisa para ler.</h2>
+  <p class="section-body">Inkwell foi desenhado para leitores sérios. Sem distrações, sem anúncios, sem internet obrigatória.</p>
+
+  <div class="features-grid">
+    <div class="feature-card anim-fade-up">
+      <div class="feature-number">01</div>
+      <div class="feature-icon-line"></div>
+      <div class="feature-title">Funciona offline</div>
+      <p class="feature-desc">Instale como app e leia sem internet. Seus livros ficam salvos localmente no dispositivo — perfeito para viagens e áreas sem sinal.</p>
+    </div>
+
+    <div class="feature-card anim-fade-up">
+      <div class="feature-number">02</div>
+      <div class="feature-icon-line"></div>
+      <div class="feature-title">Biblioteca visual</div>
+      <p class="feature-desc">Capa, título e autor organizados em uma prateleira elegante. Importe seus EPUBs e acesse toda a coleção com um toque.</p>
+    </div>
+
+    <div class="feature-card anim-fade-up">
+      <div class="feature-number">03</div>
+      <div class="feature-icon-line"></div>
+      <div class="feature-title">Retomada automática</div>
+      <p class="feature-desc">O Inkwell lembra exatamente onde você parou em cada livro. Abra qualquer dispositivo e continue de onde saiu — sem perder uma linha.</p>
+    </div>
+
+    <div class="feature-card anim-fade-up">
+      <div class="feature-number">04</div>
+      <div class="feature-icon-line"></div>
+      <div class="feature-title">Tipografia ajustável</div>
+      <p class="feature-desc">Escolha entre 7 fontes literárias clássicas, ajuste tamanho, margens, espaçamento e alterne entre modo claro e escuro e-ink.</p>
+    </div>
+
+    <div class="feature-card anim-fade-up">
+      <div class="feature-number">05</div>
+      <div class="feature-icon-line"></div>
+      <div class="feature-title">Contador de páginas</div>
+      <p class="feature-desc">Paginação inteligente que se recalcula automaticamente conforme suas configurações. Sempre sabe quantas páginas faltam no capítulo.</p>
+    </div>
+
+    <div class="feature-card anim-fade-up">
+      <div class="feature-number">06</div>
+      <div class="feature-icon-line"></div>
+      <div class="feature-title">Tempo de leitura</div>
+      <p class="feature-desc">O app calcula seu ritmo de leitura pessoal e estima com precisão quanto tempo você levará para terminar qualquer livro da biblioteca.</p>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section id="how" class="section-full">
+  <div class="section-inner">
+    <div class="how-layout">
+      <div>
+        <div class="section-eyebrow">Como funciona</div>
+        <h2 class="section-title">Simples como<br>abrir um livro.</h2>
+
+        <ul class="steps-list">
+          <li class="step-item anim-fade-up">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <div class="step-title">Crie sua conta</div>
+              <p class="step-desc">Cadastro em segundos. Basta e-mail e senha. Nenhuma informação desnecessária solicitada.</p>
+            </div>
+          </li>
+          <li class="step-item anim-fade-up">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <div class="step-title">Importe seus EPUBs</div>
+              <p class="step-desc">Arraste e solte seus arquivos .epub diretamente na biblioteca. Os livros ficam armazenados localmente, apenas no seu dispositivo.</p>
+            </div>
+          </li>
+          <li class="step-item anim-fade-up">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <div class="step-title">Leia do seu jeito</div>
+              <p class="step-desc">Toque na margem direita para avançar, esquerda para voltar. Ajuste a fonte e as margens ao seu gosto. E-ink puro.</p>
+            </div>
+          </li>
+          <li class="step-item anim-fade-up">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              <div class="step-title">Continue de onde parou</div>
+              <p class="step-desc">Feche o app quando quiser. Na próxima sessão, você estará exatamente na mesma página, no mesmo parágrafo.</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="ereader-mockup anim-fade-up">
+        <div class="ereader-bar">
+          <span class="ereader-bar-title">Dom Casmurro</span>
+          <span class="ereader-bar-pct">47%</span>
+        </div>
+        <div class="ereader-page">
+          <div class="ereader-chapter">Capítulo XIV</div>
+          <div class="ereader-text">
+            <p>A primeira vez que ergui os olhos para ela, tinha ela os seus no chão. Ergueu-os logo, vagarosamente, sem acanhamento nem audácia, com toda aquela serenidade que ia ser a feição do seu caráter.</p>
+            <p>Não eram negros, como eu dissera; eram escuros, mas de uma cor particular, que não sei definir com rigor. Verdes? Castanhos? Tais olhos eram como o mar e o céu.</p>
+          </div>
+        </div>
+        <div class="ereader-nav">
+          <span>← Cap. XIII</span>
+          <span>Pág. 94 de 198</span>
+          <span>Cap. XV →</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Parallax quote -->
+<div class="parallax-section">
+  <div class="parallax-bg-text" id="parallax-quote-bg">Inkwell</div>
+  <blockquote class="parallax-quote anim-fade-up">
+    "Um leitor vive mil vidas antes de morrer. O homem que nunca lê, vive apenas uma."
+  </blockquote>
+  <p class="parallax-attr">George R.R. Martin</p>
+</div>
+
+<!-- Pricing -->
+<section id="pricing">
+  <div class="section-eyebrow">Preço</div>
+  <h2 class="section-title">Um preço.<br>Sem surpresas.</h2>
+  <p class="section-body">Acesso completo ao Inkwell por um valor fixo mensal. Cancele quando quiser, sem multa, sem burocracia.</p>
+
+  <div class="pricing-container">
+    <div class="pricing-card anim-fade-up">
+      <div class="pricing-badge">Plano único</div>
+      <div class="pricing-name">Inkwell Completo</div>
+      <div class="pricing-amount">
+        <span class="pricing-currency">R$</span>
+        <span class="pricing-value">7</span>
+        <span class="pricing-cents">,00</span>
+      </div>
+      <div class="pricing-period">por mês · cobrado mensalmente</div>
+
+      <ul class="pricing-features">
+        <li class="pricing-feature">
+          <span class="pricing-check">—</span>
+          Biblioteca ilimitada de EPUBs locais
+        </li>
+        <li class="pricing-feature">
+          <span class="pricing-check">—</span>
+          Funciona offline como app instalável (PWA)
+        </li>
+        <li class="pricing-feature">
+          <span class="pricing-check">—</span>
+          Retomada automática em todos os livros
+        </li>
+        <li class="pricing-feature">
+          <span class="pricing-check">—</span>
+          Tipografia e margens totalmente personalizáveis
+        </li>
+        <li class="pricing-feature">
+          <span class="pricing-check">—</span>
+          Modo claro e escuro estilo e-ink
+        </li>
+        <li class="pricing-feature">
+          <span class="pricing-check">—</span>
+          Estimativa de tempo de leitura por livro
+        </li>
+        <li class="pricing-feature">
+          <span class="pricing-check">—</span>
+          Suporte em desktop, tablet e celular
+        </li>
+      </ul>
+
+      <button class="btn-primary" onclick="openModal('register')">Começar agora</button>
+
+      <p class="pricing-note">Cancele a qualquer momento · Sem taxas ocultas</p>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="section-eyebrow">Dúvidas frequentes</div>
+  <h2 class="section-title">Perguntas<br>&amp; respostas.</h2>
+
+  <div class="faq-list">
+    <div class="faq-item">
+      <button class="faq-question" onclick="toggleFaq(this)">
+        Preciso de internet para usar o Inkwell?
+        <span class="faq-toggle">+</span>
+      </button>
+      <div class="faq-answer">Não. Após o primeiro acesso, o Inkwell pode ser instalado como um app (PWA) e funciona completamente offline. Seus livros ficam salvos localmente no seu dispositivo.</div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question" onclick="toggleFaq(this)">
+        Que formatos de e-book são suportados?
+        <span class="faq-toggle">+</span>
+      </button>
+      <div class="faq-answer">Atualmente o Inkwell suporta arquivos EPUB — o formato aberto mais usado para e-books. Suporte a outros formatos está no roadmap.</div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question" onclick="toggleFaq(this)">
+        Meus livros ficam salvos na nuvem?
+        <span class="faq-toggle">+</span>
+      </button>
+      <div class="faq-answer">Não — e isso é intencional. Seus arquivos ficam armazenados apenas no seu dispositivo, no armazenamento local do navegador. Privacidade total.</div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question" onclick="toggleFaq(this)">
+        Posso usar em celular, tablet e computador?
+        <span class="faq-toggle">+</span>
+      </button>
+      <div class="faq-answer">Sim. O Inkwell é responsivo e otimizado para todos os tamanhos de tela. Funciona perfeitamente no Safari, Chrome e Firefox em qualquer dispositivo.</div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question" onclick="toggleFaq(this)">
+        Como funciona o cancelamento?
+        <span class="faq-toggle">+</span>
+      </button>
+      <div class="faq-answer">Você pode cancelar a qualquer momento, sem multa. O acesso se mantém até o fim do período pago. Nenhuma cobrança adicional será feita.</div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question" onclick="toggleFaq(this)">
+        Posso personalizar a experiência de leitura?
+        <span class="faq-toggle">+</span>
+      </button>
+      <div class="faq-answer">Completamente. Você controla fonte (7 opções clássicas), tamanho do texto, espaçamento entre letras, margens (superior, inferior, esquerda, direita), modo claro/escuro e rolagem vertical ou paginada.</div>
+    </div>
+  </div>
+</section>
+
+<!-- Final CTA -->
+<div style="padding: 120px 48px; text-align: center; border-bottom: 1px solid var(--paper-dark);">
+  <div class="ornament">
+    <div class="ornament-line"></div>
+    <div class="ornament-mark">✦</div>
+    <div class="ornament-line"></div>
+  </div>
+  <h2 class="section-title" style="max-width:600px; margin: 0 auto 24px;" class="anim-fade-up">Comece a ler<br><em>hoje mesmo.</em></h2>
+  <p class="section-body" style="margin: 0 auto 48px; text-align:center;">Junte-se a leitores que escolheram a simplicidade. Uma assinatura. Leitura ilimitada.</p>
+  <button class="btn-hero-primary" onclick="openModal('register')">Criar conta — R$7/mês</button>
+</div>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-logo">Inkwell</div>
+  <div class="footer-meta">
+    © 2026 Inkwell · Todos os direitos reservados<br>
+    Leitor de e-books · Funciona offline · R$7/mês
+  </div>
+</footer>
+
+<script>
+// ===== THEME =====
+function toggleTheme() {
+  const isDark = document.body.getAttribute('data-theme') === 'dark';
+  document.body.setAttribute('data-theme', isDark ? '' : 'dark');
+  document.getElementById('theme-toggle').textContent = isDark ? '◐ Modo' : '◑ Modo';
+}
+
+// ===== MODAL =====
+function openModal(tab) {
+  document.getElementById('modal-overlay').classList.add('active');
+  document.body.style.overflow = 'hidden';
+  if (tab) switchTab(tab);
+}
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('active');
+  document.body.style.overflow = '';
+}
+function switchTab(tab) {
+  document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.modal-tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+// ===== AUTH ACTIONS =====
+function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const msg = document.getElementById('login-msg');
+  if (!email || !pass) { msg.textContent = '↳ Preencha e-mail e senha.'; msg.className='field-msg error'; return; }
+  msg.textContent = '↳ Verificando...'; msg.className='field-msg';
+  setTimeout(() => {
+    msg.textContent = '↳ Redirecionando para o app...';
+    // Salva credenciais para auto-login no app
+    localStorage.setItem('inkwell_pending_session', JSON.stringify({ email, pass }));
+    setTimeout(() => { window.location.href = '/app'; }, 800);
+  }, 900);
+}
+function doRegister() {
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const pass = document.getElementById('reg-pass').value;
+  const msg = document.getElementById('reg-msg');
+  if (!name || !email || !pass) { msg.textContent = '↳ Preencha todos os campos.'; msg.className='field-msg error'; return; }
+  if (pass.length < 6) { msg.textContent = '↳ Senha deve ter ao menos 6 caracteres.'; msg.className='field-msg error'; return; }
+  msg.textContent = '↳ Criando sua conta...'; msg.className='field-msg';
+  // Registra o usuário localmente para compatibilidade offline
+  try {
+    let users = JSON.parse(localStorage.getItem('inkwell_users') || '[]');
+    if (!users.find(u => u.email === email)) {
+      users.push({ id: 'u_' + Date.now(), name, email, password: pass, role: 'user', status: 'active', created: new Date().toISOString() });
+      localStorage.setItem('inkwell_users', JSON.stringify(users));
+    }
+  } catch(_) {}
+  // Salva credenciais para auto-login no app
+  localStorage.setItem('inkwell_pending_session', JSON.stringify({ email, pass }));
+  setTimeout(() => {
+    msg.textContent = '↳ Conta criada! Redirecionando...'; msg.className='field-msg success';
+    setTimeout(() => { window.location.href = '/app'; }, 1000);
+  }, 1200);
+}
+
+// ===== SMOOTH SCROLL =====
+function scrollTo(selector) {
+  const el = document.querySelector(selector);
+  if (el) el.scrollIntoView({ behavior: 'smooth' });
+}
+
+// ===== NAVBAR SCROLL =====
+const navbar = document.getElementById('navbar');
+window.addEventListener('scroll', () => {
+  navbar.classList.toggle('scrolled', window.scrollY > 60);
+  updateParallax();
+});
+
+// ===== PARALLAX =====
+function updateParallax() {
+  const scrollY = window.scrollY;
+  const stripes = document.getElementById('parallax-stripes');
+  const lines = document.getElementById('parallax-lines');
+  const quoteBg = document.getElementById('parallax-quote-bg');
+  const device = document.getElementById('hero-device');
+
+  if (stripes) stripes.style.transform = `translateY(${scrollY * 0.35}px)`;
+  if (lines) lines.style.transform = `translateY(${scrollY * 0.15}px)`;
+  if (quoteBg) {
+    const section = quoteBg.closest('.parallax-section');
+    if (section) {
+      const rect = section.getBoundingClientRect();
+      const progress = -rect.top / window.innerHeight;
+      quoteBg.style.transform = `translateX(${progress * -60}px)`;
+    }
+  }
+}
+
+// ===== HERO DEVICE REVEAL =====
+setTimeout(() => {
+  const device = document.getElementById('hero-device');
+  if (device) device.classList.add('visible');
+}, 400);
+
+// ===== ANIMATE ON SCROLL =====
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.anim-fade-up').forEach(el => observer.observe(el));
+
+// ===== FAQ =====
+function toggleFaq(btn) {
+  const item = btn.closest('.faq-item');
+  item.classList.toggle('open');
+}
+
+// ===== KEYBOARD =====
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+</script>
+</body>
+</html>

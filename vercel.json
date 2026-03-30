@@ -1,1 +1,7 @@
-{"rewrites":[{"source":"/","destination":"/webapp/inkwell-reader.html"}]}
+{
+  "rewrites": [
+    { "source": "/",      "destination": "/webapp/landing.html" },
+    { "source": "/app",   "destination": "/webapp/inkwell-reader.html" },
+    { "source": "/leitor","destination": "/webapp/inkwell-reader.html" }
+  ]
+}
