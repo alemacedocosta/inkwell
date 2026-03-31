@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <!-- Background -->
+  <rect width="192" height="192" rx="38" fill="#1a1a18"/>
+
+  <!-- ===== INKWELL JAR ===== -->
+  <!-- Jar body (wide rounded bottom) -->
+  <path d="M 46 158 Q 38 158 36 148 L 32 106 Q 30 88 48 84 L 144 84 Q 162 88 160 106 L 156 148 Q 154 158 146 158 Z"
+        fill="#f5f0e8"/>
+  <!-- Jar neck (narrow) -->
+  <rect x="74" y="56" width="44" height="32" rx="6" fill="#f5f0e8"/>
+  <!-- Jar rim -->
+  <rect x="66" y="50" width="60" height="14" rx="7" fill="#f5f0e8"/>
+
+  <!-- Ink fill inside jar (dark) -->
+  <path d="M 50 158 Q 42 158 40 148 L 36 116 Q 35 104 50 102 L 142 102 Q 157 104 156 116 L 152 148 Q 150 158 142 158 Z"
+        fill="#1a1a18" opacity="0.72"/>
+
+  <!-- Ink meniscus line -->
+  <ellipse cx="96" cy="102" rx="46" ry="5" fill="#1a1a18" opacity="0.35"/>
+
+  <!-- Subtle shine on jar -->
+  <ellipse cx="70" cy="118" rx="6" ry="14" fill="#f5f0e8" opacity="0.12"/>
+
+  <!-- ===== QUILL PEN ===== -->
+  <!-- Quill shaft -->
+  <line x1="110" y1="56" x2="148" y2="12"
+        stroke="#f5f0e8" stroke-width="4" stroke-linecap="round"/>
+  <!-- Quill barb (right side of feather) -->
+  <path d="M 148 12 C 140 20 130 32 120 44 L 110 56 C 118 46 128 34 136 22 Z"
+        fill="#f5f0e8" opacity="0.80"/>
+  <!-- Quill barb (left side, slightly darker for depth) -->
+  <path d="M 148 12 C 144 18 138 28 130 38 L 110 56 C 116 48 124 38 132 28 Z"
+        fill="#1a1a18" opacity="0.20"/>
+</svg>

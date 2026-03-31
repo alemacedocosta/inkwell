@@ -1457,7 +1457,11 @@ async function doRegister() {
     if (error && !error.message.includes('duplicate')) {
       console.warn('[Register] Supabase insert error:', error.message);
     }
+<<<<<<< HEAD
   } catch(e) { console.warn('[Register] Supabase insert exception:', e); }
+=======
+  } catch(e) { console.warn('[Register] insert exception:', e.message); }
+>>>>>>> f5cc1ae2b64646b8958fab06ffffc92411ea176a
 
   // Salva localmente
   try {
