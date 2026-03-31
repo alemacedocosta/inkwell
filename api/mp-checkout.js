@@ -4,7 +4,7 @@
 
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
 const MP_PLAN_ID = process.env.MP_PLAN_ID;
-const APP_URL = process.env.APP_URL || 'https://inkwell.vercel.app';
+const APP_URL = process.env.APP_URL || 'https://inkwell-seven-jade.vercel.app';
 
 export default async function handler(req, res) {
   // CORS
@@ -18,20 +18,16 @@ export default async function handler(req, res) {
   if (!email) return res.status(400).json({ error: 'email obrigatório' });
 
   try {
+    // Cria preapproval vinculado ao plano. Não reenviar auto_recurring —
+    // já está definido no plano. Enviar apenas payer_email + urls.
     const body = {
       preapproval_plan_id: MP_PLAN_ID,
       reason: 'Inkwell — Leitor de E-books',
       payer_email: email,
       back_url: `${APP_URL}/app`,
       // notification_url garante que este app receba os eventos,
-      // independentemente do IPN configurado na aplicação MP (que pode ser de outro projeto)
+      // independentemente do IPN configurado na aplicação MP
       notification_url: `${APP_URL}/api/mp-webhook`,
-      auto_recurring: {
-        frequency: 1,
-        frequency_type: 'months',
-        transaction_amount: 7.00,
-        currency_id: 'BRL'
-      }
     };
 
     const response = await fetch('https://api.mercadopago.com/preapproval', {
@@ -47,8 +43,8 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('MP checkout error:', data);
-      return res.status(400).json({ error: data.message || 'Erro ao gerar checkout' });
+      console.error('MP checkout error:', JSON.stringify(data));
+      return res.status(400).json({ error: data.message || 'Erro ao gerar checkout', detail: data });
     }
 
     return res.status(200).json({
