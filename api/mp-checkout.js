@@ -23,6 +23,9 @@ export default async function handler(req, res) {
       reason: 'Inkwell — Leitor de E-books',
       payer_email: email,
       back_url: `${APP_URL}/app`,
+      // notification_url garante que este app receba os eventos,
+      // independentemente do IPN configurado na aplicação MP (que pode ser de outro projeto)
+      notification_url: `${APP_URL}/api/mp-webhook`,
       auto_recurring: {
         frequency: 1,
         frequency_type: 'months',
