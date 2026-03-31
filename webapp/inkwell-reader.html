@@ -3,10 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#f5f0e8">
+<meta name="theme-color" content="#1a1a18">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Inkwell">
 <title>Inkwell — Leitor de E-books</title>
+<!-- PWA / Ícone -->
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,600;1,400&family=Merriweather:ital,wght@0,300;0,400;1,300&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=PT+Serif:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,wght@0,300;0,400;1,300&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 
@@ -1289,6 +1294,7 @@ input[type="file"] { display: none; }
       <div class="reader-title-header" id="readerTitleHeader">—</div>
       <div class="reader-header-actions">
         <button class="icon-btn" onclick="showTOC()">☰</button>
+        <button class="icon-btn" id="btnFullscreen" onclick="toggleFullscreen()" title="Tela cheia" style="font-size:14px">⛶</button>
         <button class="icon-btn" onclick="openSettings()">⚙</button>
       </div>
     </div>
@@ -1330,6 +1336,7 @@ input[type="file"] { display: none; }
       <button class="admin-tab active" onclick="switchAdminTab('users')">Usuários</button>
       <button class="admin-tab" onclick="switchAdminTab('stats')">Estatísticas</button>
       <button class="admin-tab" onclick="switchAdminTab('create')">Criar Usuário</button>
+      <button class="admin-tab" onclick="switchAdminTab('invites')">Degustação</button>
     </div>
     <div class="admin-body">
       <div class="admin-tab-content active" id="tab-users">
@@ -1383,6 +1390,59 @@ input[type="file"] { display: none; }
           </div>
         </div>
       </div>
+
+      <!-- INVITES / DEGUSTAÇÃO TAB -->
+      <div class="admin-tab-content" id="tab-invites">
+        <div class="admin-section">
+          <div class="admin-section-title">Enviar Convite de Degustação</div>
+          <p style="font-size:10px;color:var(--ink-faint);margin-bottom:16px;line-height:1.6">
+            Cria uma conta temporária para que a pessoa teste o Inkwell gratuitamente pelo período definido.
+            Envie o e-mail e a senha temporária gerados pelo aplicativo para o convidado.
+          </p>
+          <div class="add-user-form">
+            <div class="field-group">
+              <label class="field-label">E-mail do Convidado</label>
+              <input class="field-input" type="email" id="inviteEmail" placeholder="convidado@email.com">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Dias de Acesso</label>
+              <input class="field-input" type="number" id="inviteDays" value="7" min="1" max="30" placeholder="7">
+            </div>
+            <div class="form-full">
+              <button class="btn-primary" onclick="createInvite()">Gerar Convite</button>
+            </div>
+          </div>
+
+          <!-- Result box (hidden until invite is created) -->
+          <div id="inviteResult" style="display:none;margin-top:24px;padding:20px;border:1px solid var(--ink);position:relative;">
+            <div style="font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:14px">Credenciais de Acesso — Copie e Envie ao Convidado</div>
+            <div style="font-size:11px;line-height:2.2">
+              <div><span style="color:var(--ink-faint);font-size:9px;letter-spacing:0.1em">E-MAIL</span><br><strong id="inviteResultEmail" style="font-size:13px"></strong></div>
+              <div style="margin-top:8px"><span style="color:var(--ink-faint);font-size:9px;letter-spacing:0.1em">SENHA TEMPORÁRIA</span><br><strong id="inviteResultPass" style="font-size:13px;font-family:monospace;letter-spacing:0.15em"></strong></div>
+              <div style="margin-top:8px"><span style="color:var(--ink-faint);font-size:9px;letter-spacing:0.1em">ACESSO ATÉ</span><br><strong id="inviteResultExpiry" style="font-size:13px"></strong></div>
+              <div style="margin-top:8px"><span style="color:var(--ink-faint);font-size:9px;letter-spacing:0.1em">LINK</span><br><strong id="inviteResultLink" style="font-size:11px;word-break:break-all"></strong></div>
+            </div>
+            <button onclick="copyInviteCredentials()" class="btn-small" style="margin-top:16px;width:100%">Copiar Credenciais</button>
+          </div>
+        </div>
+
+        <div class="admin-section" style="margin-top:0">
+          <div class="admin-section-title">Convidados Ativos</div>
+          <div style="overflow-x:auto">
+            <table class="users-table">
+              <thead><tr>
+                <th>E-mail</th>
+                <th>Acesso até</th>
+                <th>Ações</th>
+              </tr></thead>
+              <tbody id="invitesTableBody">
+                <tr><td colspan="3" style="text-align:center;font-size:10px;color:var(--ink-faint)">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -1634,7 +1694,8 @@ async function initDefaultAdmin() {
         email: 'admin@inkwell.com',
         password: 'admin123',
         role: 'admin',
-        status: 'active'
+        status: 'active',
+        subscription_status: 'active'
       });
     }
   } catch(e) {
@@ -1642,7 +1703,7 @@ async function initDefaultAdmin() {
     let users = [];
     try { users = JSON.parse(localStorage.getItem('inkwell_users') || '[]'); } catch(_) {}
     if (!users.find(u => u.role === 'admin')) {
-      users.push({ id: 'admin_1', email: 'admin@inkwell.com', password: 'admin123', role: 'admin', status: 'active', created: new Date().toISOString() });
+      users.push({ id: 'admin_1', email: 'admin@inkwell.com', password: 'admin123', role: 'admin', status: 'active', subscription_status: 'active', created_at: new Date().toISOString() });
       localStorage.setItem('inkwell_users', JSON.stringify(users));
     }
   }
@@ -1898,12 +1959,16 @@ async function doLogin() {
 // SUBSCRIPTION CHECK
 // ============================================================
 function checkSubscription(user) {
-  // Admin sempre passa
+  // Admin / superuser sempre passa
   if (user.role === 'admin') return true;
 
   const status = user.subscription_status;
   const endDate = user.subscription_end_date ? new Date(user.subscription_end_date) : null;
+  const trialEnd = user.trial_end_date ? new Date(user.trial_end_date) : null;
   const now = new Date();
+
+  // Trial / degustação ativo
+  if (trialEnd && trialEnd > now) return true;
 
   // Ativo e dentro do prazo
   if (status === 'active' && (!endDate || endDate > now)) return true;
@@ -1918,6 +1983,8 @@ function checkSubscription(user) {
 
 function filterBooksForUser() {
   if (!APP.currentUser) return;
+  // Admin vê todos os livros — sem filtragem por userId
+  if (APP.currentUser.role === 'admin') return;
   const uid = APP.currentUser.id || APP.currentUser.email;
 
   // Migração única: o primeiro usuário a logar após este fix reivindica
@@ -2933,6 +3000,8 @@ function switchAdminTab(tab) {
   document.querySelectorAll('.admin-tab-content').forEach(t => t.classList.remove('active'));
   event.target.classList.add('active');
   document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'invites') renderAdminInvites();
+  if (tab === 'stats')   renderAdminStats();
 }
 
 async function renderAdminUsers() {
@@ -3053,6 +3122,8 @@ async function saveEditUser() {
 
 async function renderAdminStats() {
   const users = await getUsers();
+  const now = new Date();
+  const trialUsers = users.filter(u => u.trial_end_date && new Date(u.trial_end_date) > now);
   const grid = document.getElementById('statsGrid');
   grid.innerHTML = `
     <div class="stat-card">
@@ -3060,12 +3131,16 @@ async function renderAdminStats() {
       <div class="stat-label">Usuários</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">${users.filter(u=>u.status==='active').length}</div>
-      <div class="stat-label">Ativos</div>
+      <div class="stat-value">${users.filter(u=>u.subscription_status==='active').length}</div>
+      <div class="stat-label">Assinantes</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">${users.filter(u=>u.status==='pending').length}</div>
-      <div class="stat-label">Pendentes</div>
+      <div class="stat-value">${trialUsers.length}</div>
+      <div class="stat-label">Degustação</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${users.filter(u=>u.status==='blocked').length}</div>
+      <div class="stat-label">Bloqueados</div>
     </div>
     <div class="stat-card">
       <div class="stat-value">${APP.books.length}</div>
@@ -3073,6 +3148,122 @@ async function renderAdminStats() {
     </div>
   `;
 }
+
+// ============================================================
+// CONVITES / DEGUSTAÇÃO
+// ============================================================
+async function createInvite() {
+  const email   = document.getElementById('inviteEmail').value.trim();
+  const days    = parseInt(document.getElementById('inviteDays').value) || 7;
+  if (!email) { showNotification('Digite um e-mail'); return; }
+
+  // Verifica se já existe
+  const { data: existing } = await sb.from('inkwell_users').select('id').eq('email', email).maybeSingle();
+  if (existing) { showNotification('E-mail já cadastrado'); return; }
+
+  // Gera senha temporária legível (8 chars)
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  let tempPass = '';
+  for (let i = 0; i < 8; i++) tempPass += chars[Math.floor(Math.random() * chars.length)];
+
+  const trialEnd = new Date();
+  trialEnd.setDate(trialEnd.getDate() + days);
+
+  const { error } = await sb.from('inkwell_users').insert({
+    id: 'u_' + Date.now(),
+    email,
+    password: tempPass,
+    role: 'user',
+    status: 'active',
+    subscription_status: 'trial',
+    trial_end_date: trialEnd.toISOString(),
+    created_at: new Date().toISOString()
+  });
+
+  if (error) { showNotification('Erro: ' + error.message); return; }
+
+  // Exibe as credenciais para o admin copiar
+  const box = document.getElementById('inviteResult');
+  box.style.display = 'block';
+  document.getElementById('inviteResultEmail').textContent   = email;
+  document.getElementById('inviteResultPass').textContent    = tempPass;
+  document.getElementById('inviteResultExpiry').textContent  = trialEnd.toLocaleDateString('pt-BR');
+  document.getElementById('inviteResultLink').textContent    = 'https://inkwell-seven-jade.vercel.app/';
+
+  document.getElementById('inviteEmail').value = '';
+  renderAdminInvites();
+  showNotification('Convite criado com sucesso!');
+}
+
+function copyInviteCredentials() {
+  const email   = document.getElementById('inviteResultEmail').textContent;
+  const pass    = document.getElementById('inviteResultPass').textContent;
+  const expiry  = document.getElementById('inviteResultExpiry').textContent;
+  const link    = document.getElementById('inviteResultLink').textContent;
+  const text = `Inkwell — Convite de Degustação\n\nAcesse: ${link}\nE-mail: ${email}\nSenha: ${pass}\nAcesso gratuito até: ${expiry}\n\nApós o período, a assinatura é R$7/mês.`;
+  navigator.clipboard.writeText(text).then(() => showNotification('Copiado!')).catch(() => showNotification('Use Ctrl+C'));
+}
+
+async function renderAdminInvites() {
+  const tbody = document.getElementById('invitesTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;font-size:10px;color:var(--ink-faint)">Carregando...</td></tr>';
+
+  const { data: invites } = await sb.from('inkwell_users')
+    .select('id, email, trial_end_date, status')
+    .eq('subscription_status', 'trial')
+    .order('trial_end_date', { ascending: false });
+
+  tbody.innerHTML = '';
+  if (!invites || invites.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;font-size:10px;color:var(--ink-faint)">Nenhum convidado ativo</td></tr>';
+    return;
+  }
+
+  const now = new Date();
+  invites.forEach(u => {
+    const expiry = u.trial_end_date ? new Date(u.trial_end_date) : null;
+    const expired = expiry && expiry < now;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-size:10px">${u.email}</td>
+      <td style="font-size:10px">${expiry ? expiry.toLocaleDateString('pt-BR') : '—'} ${expired ? '<span style="color:var(--ink-faint)">(expirado)</span>' : ''}</td>
+      <td>
+        <div class="user-actions">
+          <button class="btn-small danger" onclick="revokeInvite('${u.id}')">Revogar</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function revokeInvite(id) {
+  confirm2('Revogar Convite', 'O acesso de degustação será removido imediatamente.', async () => {
+    await sb.from('inkwell_users').update({ subscription_status: 'inactive', trial_end_date: null }).eq('id', id);
+    renderAdminInvites();
+    showNotification('Convite revogado');
+  });
+}
+
+// ============================================================
+// FULLSCREEN
+// ============================================================
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  } else {
+    document.exitFullscreen?.();
+  }
+}
+
+document.addEventListener('fullscreenchange', () => {
+  const btn = document.getElementById('btnFullscreen');
+  if (!btn) return;
+  // ⛶ = expand (enter fullscreen)  ⊡ = compress (exit fullscreen)
+  btn.textContent = document.fullscreenElement ? '⊡' : '⛶';
+  btn.title       = document.fullscreenElement ? 'Sair da tela cheia' : 'Tela cheia';
+});
 
 // ============================================================
 // MODALS / CONFIRM
