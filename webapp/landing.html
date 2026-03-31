@@ -1442,19 +1442,48 @@ async function doRegister() {
   if (!name || !email || !pass) { msg.textContent = '↳ Preencha todos os campos.'; msg.className='field-msg error'; return; }
   if (pass.length < 6) { msg.textContent = '↳ Senha deve ter ao menos 6 caracteres.'; msg.className='field-msg error'; return; }
   msg.textContent = '↳ Criando sua conta...'; msg.className='field-msg';
-  const newUser = { id: 'u_' + Date.now(), name, email, password: pass, role: 'user', status: 'active', created: new Date().toISOString() };
+
+  // Cria usuário com status pendente até o pagamento ser confirmado
+  const newUser = {
+    id: 'u_' + Date.now(),
+    name, email, password: pass,
+    role: 'user',
+    status: 'active',
+    subscription_status: 'inactive',
+    created: new Date().toISOString()
+  };
   try {
     const { error } = await sb.from('inkwell_users').insert(newUser);
     if (error && !error.message.includes('duplicate')) throw error;
   } catch(_) {}
-  // Sempre salva localmente também
+
+  // Salva localmente
   try {
     let users = JSON.parse(localStorage.getItem('inkwell_users') || '[]');
     if (!users.find(u => u.email === email)) users.push(newUser);
     localStorage.setItem('inkwell_users', JSON.stringify(users));
   } catch(_) {}
+
+  msg.textContent = '↳ Conta criada! Redirecionando para pagamento...'; msg.className='field-msg success';
+
+  // Gera link de checkout personalizado no Mercado Pago
+  try {
+    const resp = await fetch('/api/mp-checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, name })
+    });
+    const data = await resp.json();
+    if (data.checkout_url) {
+      // Salva sessão pendente para quando o usuário voltar após pagar
+      localStorage.setItem('inkwell_pending_session', JSON.stringify({ email, pass }));
+      setTimeout(() => { window.location.href = data.checkout_url; }, 900);
+      return;
+    }
+  } catch(e) { console.warn('MP checkout error:', e); }
+
+  // Fallback: deixa entrar direto (sem pagamento) — remover em produção se quiser bloquear
   localStorage.setItem('inkwell_pending_session', JSON.stringify({ email, pass }));
-  msg.textContent = '↳ Conta criada! Abrindo biblioteca...'; msg.className='field-msg success';
   setTimeout(() => { window.location.href = '/app'; }, 900);
 }
 

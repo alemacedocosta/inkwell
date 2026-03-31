@@ -1242,6 +1242,24 @@ input[type="file"] { display: none; }
 <!-- Notification -->
 <div class="notification" id="notification"></div>
 
+<!-- SCREEN: SUBSCRIPTION (assinatura vencida/inativa) -->
+<div class="screen" id="screen-subscription" style="flex-direction:column;align-items:center;justify-content:center;background:var(--paper);">
+  <div class="login-container" style="max-width:420px;text-align:center;">
+    <div class="login-logo">Inkwell</div>
+    <div class="login-tagline" style="margin-bottom:32px;">Acesso à biblioteca</div>
+    <div style="font-family:'EB Garamond',serif;font-size:20px;line-height:1.6;color:var(--ink-light);margin-bottom:32px;">
+      Sua assinatura está<br><strong style="color:var(--ink);">inativa ou vencida.</strong><br>
+      Renove para continuar lendo.
+    </div>
+    <div style="font-family:'EB Garamond',serif;font-size:32px;font-style:italic;margin-bottom:8px;">R$ 7,00<span style="font-size:18px;">/mês</span></div>
+    <div style="font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:32px;">Cancele quando quiser</div>
+    <button class="btn-primary" onclick="renovarAssinatura()" id="btnRenovar">Renovar assinatura</button>
+    <div style="margin-top:20px;">
+      <a href="/" style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-faint);text-decoration:none;">← Voltar para a página inicial</a>
+    </div>
+  </div>
+</div>
+
 <!-- SCREEN: LIBRARY -->
 <div class="screen" id="screen-library">
   <div style="width:100%; height:100%; display:flex; flex-direction:column;">
@@ -1657,6 +1675,7 @@ window.addEventListener('load', async () => {
           const { data, error } = await sb.from('inkwell_users')
             .select('*').eq('email', email).eq('password', pass).maybeSingle();
           if (!error && data && data.status !== 'blocked') {
+            if (!checkSubscription(data)) return; // bloqueia se assinatura inválida
             APP.currentUser = data;
             filterBooksForUser();
             await syncBooksFromCloud();
@@ -1673,6 +1692,7 @@ window.addEventListener('load', async () => {
           const users = JSON.parse(localStorage.getItem('inkwell_users') || '[]');
           const user = users.find(u => u.email === email && u.password === pass && u.status !== 'blocked');
           if (user) {
+            if (!checkSubscription(user)) return;
             APP.currentUser = user;
             filterBooksForUser();
             document.getElementById('adminBtn').style.display = user.role === 'admin' ? '' : 'none';
@@ -1874,11 +1894,73 @@ async function doLogin() {
   }
 }
 
+// ============================================================
+// SUBSCRIPTION CHECK
+// ============================================================
+function checkSubscription(user) {
+  // Admin sempre passa
+  if (user.role === 'admin') return true;
+
+  const status = user.subscription_status;
+  const endDate = user.subscription_end_date ? new Date(user.subscription_end_date) : null;
+  const now = new Date();
+
+  // Ativo e dentro do prazo
+  if (status === 'active' && (!endDate || endDate > now)) return true;
+
+  // Cancelado mas ainda no período pago
+  if (status === 'cancelled' && endDate && endDate > now) return true;
+
+  // Vencido, inativo ou inadimplente — redireciona para renovação
+  einkFlash(() => showScreen('screen-subscription'));
+  return false;
+}
+
 function filterBooksForUser() {
   if (!APP.currentUser) return;
   const uid = APP.currentUser.id || APP.currentUser.email;
-  // Mostra: livros do usuário atual + livros sem userId (legados, importados antes dessa correção)
-  APP.books = APP.books.filter(b => !b.userId || b.userId === uid);
+
+  // Migração única: o primeiro usuário a logar após este fix reivindica
+  // todos os livros sem dono (importados antes da correção).
+  const migrationKey = 'inkwell_books_migrated_v1';
+  if (!localStorage.getItem(migrationKey)) {
+    APP.books.forEach(b => {
+      if (!b.userId) {
+        b.userId = uid;
+        saveBookToDB(b); // persiste o userId no IndexedDB
+      }
+    });
+    localStorage.setItem(migrationKey, uid);
+  }
+
+  // A partir daqui: cada usuário vê apenas seus próprios livros
+  APP.books = APP.books.filter(b => b.userId === uid);
+}
+
+async function renovarAssinatura() {
+  const btn = document.getElementById('btnRenovar');
+  btn.textContent = 'Aguarde...';
+  btn.disabled = true;
+  try {
+    const user = APP.currentUser;
+    const email = user?.email;
+    if (!email) { window.location.href = '/'; return; }
+    const resp = await fetch('/api/mp-checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, name: user.name || email })
+    });
+    const data = await resp.json();
+    if (data.checkout_url) {
+      window.location.href = data.checkout_url;
+    } else {
+      btn.textContent = 'Erro — tente novamente';
+      btn.disabled = false;
+    }
+  } catch(e) {
+    btn.textContent = 'Erro — tente novamente';
+    btn.disabled = false;
+  }
 }
 
 function doLogout() {
