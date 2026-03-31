@@ -39,7 +39,9 @@ export default async function handler(req, res) {
     }
 
     // Adiciona payer_email como query param (MP preenche automaticamente no checkout)
-    const checkoutUrl = `${initPoint}?preapprover_email=${encodeURIComponent(email)}`;
+    // Garante uso de '&' se initPoint já tem query params (ex: ?preapproval_plan_id=...)
+    const sep = initPoint.includes('?') ? '&' : '?';
+    const checkoutUrl = `${initPoint}${sep}preapprover_email=${encodeURIComponent(email)}`;
 
     console.log(`[MP Checkout] Returning plan init_point for ${email}`);
     return res.status(200).json({
