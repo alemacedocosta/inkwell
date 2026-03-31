@@ -1,5 +1,7 @@
 // api/mp-checkout.js
-// Gera um link de checkout personalizado por usuário para assinar o plano.
+// Retorna o init_point do plano MP para o usuário assinar.
+// O MP exige card_token_id para criar preapprovals via API server-to-server;
+// a forma correta é usar o init_point do preapproval_plan diretamente.
 // POST { email, name }
 
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
@@ -18,38 +20,32 @@ export default async function handler(req, res) {
   if (!email) return res.status(400).json({ error: 'email obrigatório' });
 
   try {
-    // Cria preapproval vinculado ao plano. Não reenviar auto_recurring —
-    // já está definido no plano. Enviar apenas payer_email + urls.
-    const body = {
-      preapproval_plan_id: MP_PLAN_ID,
-      reason: 'Inkwell — Leitor de E-books',
-      payer_email: email,
-      back_url: `${APP_URL}/app`,
-      // notification_url garante que este app receba os eventos,
-      // independentemente do IPN configurado na aplicação MP
-      notification_url: `${APP_URL}/api/mp-webhook`,
-    };
-
-    const response = await fetch('https://api.mercadopago.com/preapproval', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${MP_ACCESS_TOKEN}`,
-        'Content-Type': 'application/json',
-        'X-Idempotency-Key': `inkwell_${email}_${Date.now()}`
-      },
-      body: JSON.stringify(body)
+    // Busca o plano para obter o init_point oficial
+    const planRes = await fetch(`https://api.mercadopago.com/preapproval_plan/${MP_PLAN_ID}`, {
+      headers: { 'Authorization': `Bearer ${MP_ACCESS_TOKEN}` }
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('MP checkout error:', JSON.stringify(data));
-      return res.status(400).json({ error: data.message || 'Erro ao gerar checkout', detail: data });
+    if (!planRes.ok) {
+      const err = await planRes.json();
+      console.error('MP plan fetch error:', JSON.stringify(err));
+      return res.status(400).json({ error: 'Plano não encontrado no MP', detail: err });
     }
 
+    const plan = await planRes.json();
+    const initPoint = plan.init_point;
+
+    if (!initPoint) {
+      return res.status(500).json({ error: 'init_point ausente no plano MP' });
+    }
+
+    // Adiciona payer_email como query param (MP preenche automaticamente no checkout)
+    const checkoutUrl = `${initPoint}?preapprover_email=${encodeURIComponent(email)}`;
+
+    console.log(`[MP Checkout] Returning plan init_point for ${email}`);
     return res.status(200).json({
-      checkout_url: data.init_point,
-      subscription_id: data.id
+      checkout_url: checkoutUrl,
+      plan_id: plan.id,
+      plan_status: plan.status
     });
   } catch (err) {
     console.error('mp-checkout error:', err);
