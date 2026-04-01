@@ -1203,6 +1203,14 @@ body::before {
   overflow: hidden;
 }
 
+/* Allow text selection but suppress system callout/dictionary popup */
+.reader-page-content {
+  -webkit-touch-callout: none;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
+}
+
 .reader-page-content.fluid {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -1900,6 +1908,7 @@ input[type="file"] { display: none; }
   <button class="sel-btn" onclick="createHighlightFromSelection('')">Destacar</button>
   <button class="sel-btn" onclick="openCommentDialog()">Comentar</button>
   <button class="sel-btn" id="dictBtn" onclick="lookupWord()">Definição</button>
+  <button class="sel-btn" onclick="_copySelection()">Copiar</button>
 </div>
 
 <!-- Comment / Bookmark dialog -->
@@ -3666,6 +3675,10 @@ document.getElementById('readerBody').addEventListener('touchstart', e => {
 }, { passive: true });
 
 document.getElementById('readerBody').addEventListener('touchend', e => {
+  // Don't navigate if user is selecting text
+  const sel = window.getSelection();
+  if (sel && !sel.isCollapsed && sel.toString().trim().length > 1) return;
+
   const dx = e.changedTouches[0].clientX - touchStartX;
   const dy = e.changedTouches[0].clientY - touchStartY;
   if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
@@ -3829,11 +3842,10 @@ function _showHighlightMenu(id) {
 let _selData = null;
 
 document.addEventListener('mouseup', _handleSelectionUp);
-document.addEventListener('touchend', (e) => setTimeout(_handleSelectionUp, 120));
+// On touch devices wait a bit for the selection to stabilize
+document.addEventListener('touchend', () => setTimeout(_handleSelectionUp, 200));
 
-function _handleSelectionUp(e) {
-  // Don't trigger inside overlays/toolbars
-  if (e?.target?.closest('#selectionToolbar,#commentDialog,#dictPopup,.notes-overlay,.settings-overlay,.toc-overlay,.admin-overlay')) return;
+function _handleSelectionUp() {
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed || !sel.toString().trim()) {
     _hideSelectionToolbar();
@@ -3841,16 +3853,38 @@ function _handleSelectionUp(e) {
   }
   const text = sel.toString().trim();
   if (text.length < 2) { _hideSelectionToolbar(); return; }
-  if (!document.activeElement?.closest('#pageContent') && !sel.focusNode?.parentElement?.closest('#pageContent')) {
+
+  // Only activate if selection is inside the reader page content
+  const pc = document.getElementById('pageContent');
+  if (!pc || !pc.contains(sel.anchorNode)) {
     _hideSelectionToolbar(); return;
   }
+
   const range = sel.getRangeAt(0);
   const rect = range.getBoundingClientRect();
   _selData = { text };
-  // Show/hide dict button for single word
+  // Show dict button only for 1-3 words
   const wordCount = text.trim().split(/\s+/).length;
   document.getElementById('dictBtn').style.display = wordCount <= 3 ? '' : 'none';
   _showSelectionToolbar(rect);
+}
+
+function _copySelection() {
+  if (!_selData) return;
+  try {
+    navigator.clipboard.writeText(_selData.text).then(() => showNotification('Copiado'));
+  } catch(_) {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = _selData.text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showNotification('Copiado');
+  }
+  _hideSelectionToolbar();
+  window.getSelection()?.removeAllRanges();
 }
 
 function _showSelectionToolbar(rect) {
