@@ -1228,6 +1228,287 @@ input[type="file"] { display: none; }
   }
 }
 
+/* === ANNOTATIONS === */
+.inkwell-highlight {
+  border-bottom: 1.5px solid var(--ink);
+  cursor: pointer;
+  position: relative;
+  background: transparent;
+}
+.inkwell-highlight[data-comment]:not([data-comment=""])::after {
+  content: '↳';
+  font-size: 8px;
+  color: var(--ink-faint);
+  margin-left: 1px;
+  vertical-align: super;
+}
+
+/* Selection toolbar */
+.selection-toolbar {
+  position: fixed;
+  z-index: 10000;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  padding: 2px 4px;
+  display: none;
+  gap: 0;
+  align-items: center;
+  box-shadow: 2px 2px 0 var(--ink);
+  flex-wrap: nowrap;
+}
+.selection-toolbar.show { display: flex; }
+.sel-btn {
+  background: none;
+  border: none;
+  border-right: 1px solid var(--paper-dark);
+  font-family: var(--font-ui);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 6px 10px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.sel-btn:last-child { border-right: none; }
+.sel-btn:active { background: var(--paper-mid); }
+
+/* Notes overlay */
+.notes-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background: var(--paper);
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+.notes-overlay.open { display: flex; }
+.notes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--ink);
+  flex-shrink: 0;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.notes-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--paper-dark);
+  flex-shrink: 0;
+  padding: 0 20px;
+}
+.notes-tab {
+  padding: 10px 14px;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  border-left: none; border-right: none; border-top: none;
+  font-family: var(--font-ui);
+  color: var(--ink-faint);
+  transition: var(--transition-eink);
+}
+.notes-tab.active { color: var(--ink); border-bottom-color: var(--ink); }
+.notes-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 20px 40px;
+}
+.note-item {
+  border-bottom: 1px solid var(--paper-dark);
+  padding: 14px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.note-page {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.note-text {
+  font-size: 14px;
+  font-family: var(--font-body);
+  font-style: italic;
+  color: var(--ink);
+  line-height: 1.5;
+  border-left: 2px solid var(--ink);
+  padding-left: 10px;
+  cursor: pointer;
+}
+.note-text:active { background: var(--paper-mid); }
+.note-comment {
+  font-size: 10px;
+  color: var(--ink-light);
+  line-height: 1.5;
+  padding-left: 12px;
+}
+.note-del-btn {
+  background: none;
+  border: none;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  color: var(--ink-faint);
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  padding: 0;
+  text-transform: uppercase;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+.note-del-btn:active { color: var(--ink); }
+
+/* Comment/bookmark dialog */
+.comment-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 11000;
+  background: rgba(26,26,24,0.6);
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+[data-theme="dark"] .comment-dialog { background: rgba(0,0,0,0.7); }
+.comment-dialog.open { display: flex; }
+.comment-box {
+  background: var(--paper);
+  border-top: 1px solid var(--ink);
+  padding: 20px 20px 32px;
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 -3px 0 var(--ink);
+}
+.comment-dialog-title {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.comment-selected-text {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 14px;
+  border-left: 2px solid var(--ink);
+  padding-left: 10px;
+  color: var(--ink);
+  line-height: 1.5;
+  max-height: 56px;
+  overflow: hidden;
+}
+.comment-textarea {
+  width: 100%;
+  border: 1px solid var(--paper-dark);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  padding: 10px;
+  resize: none;
+  height: 72px;
+  outline: none;
+  letter-spacing: 0.03em;
+  border-radius: 0;
+  -webkit-appearance: none;
+}
+.comment-textarea:focus { border-color: var(--ink); }
+.comment-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Dict popup */
+.dict-popup {
+  position: fixed;
+  z-index: 10500;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 16px 18px;
+  max-width: 340px;
+  width: calc(100vw - 32px);
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.dict-popup.show { display: flex; }
+.dict-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.dict-word {
+  font-size: 18px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  color: var(--ink);
+}
+.dict-phonetic {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-family: var(--font-ui);
+  margin-top: 2px;
+}
+.dict-pos {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  border-bottom: 1px solid var(--paper-dark);
+  padding-bottom: 4px;
+  margin-top: 4px;
+}
+.dict-def {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+.dict-example {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--ink-light);
+  line-height: 1.5;
+  padding-left: 8px;
+  border-left: 1px solid var(--paper-dark);
+}
+.dict-close-btn {
+  background: none;
+  border: none;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--ink-faint);
+  cursor: pointer;
+  padding: 0 0 0 8px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.dict-loading {
+  font-size: 10px;
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+  text-align: center;
+  padding: 12px 0;
+}
+
 </style>
 </head>
 <body>
@@ -1293,6 +1574,8 @@ input[type="file"] { display: none; }
       <button class="reader-back" onclick="closeReader()">← Voltar</button>
       <div class="reader-title-header" id="readerTitleHeader">—</div>
       <div class="reader-header-actions">
+        <button class="icon-btn" id="btnBookmark" onclick="toggleBookmark()" title="Marcar página">◇</button>
+        <button class="icon-btn" onclick="openNotes()" title="Notas e marcadores">≡</button>
         <button class="icon-btn" onclick="showTOC()">☰</button>
         <button class="icon-btn" id="btnFullscreen" onclick="toggleFullscreen()" title="Tela cheia" style="font-size:14px">⛶</button>
         <button class="icon-btn" onclick="openSettings()">⚙</button>
@@ -1610,6 +1893,49 @@ input[type="file"] { display: none; }
       <button class="btn-primary" style="flex:1" onclick="runConfirm()">Confirmar</button>
     </div>
   </div>
+</div>
+
+<!-- Selection toolbar -->
+<div class="selection-toolbar" id="selectionToolbar">
+  <button class="sel-btn" onclick="createHighlightFromSelection('')">Destacar</button>
+  <button class="sel-btn" onclick="openCommentDialog()">Comentar</button>
+  <button class="sel-btn" id="dictBtn" onclick="lookupWord()">Definição</button>
+</div>
+
+<!-- Comment / Bookmark dialog -->
+<div class="comment-dialog" id="commentDialog">
+  <div class="comment-box">
+    <div class="comment-dialog-title" id="commentDialogTitle">Adicionar comentário</div>
+    <div class="comment-selected-text" id="commentSelectedText"></div>
+    <textarea class="comment-textarea" id="commentTextarea" placeholder="Escreva um comentário... (opcional)"></textarea>
+    <input type="hidden" id="commentDialogMode" value="highlight">
+    <div class="comment-actions">
+      <button class="btn-secondary" onclick="closeCommentDialog()">Cancelar</button>
+      <button class="btn-primary" onclick="saveComment()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Notes & Bookmarks overlay -->
+<div class="notes-overlay" id="notesOverlay">
+  <div class="notes-header">
+    <span>Notas &amp; Marcadores</span>
+    <button class="icon-btn" onclick="closeNotes()">✕</button>
+  </div>
+  <div class="notes-tabs">
+    <button class="notes-tab active" data-tab="highlights" onclick="switchNotesTab('highlights')">Destaques</button>
+    <button class="notes-tab" data-tab="bookmarks" onclick="switchNotesTab('bookmarks')">Marcadores</button>
+  </div>
+  <div class="notes-body" id="notesBody"></div>
+</div>
+
+<!-- Dictionary popup -->
+<div class="dict-popup" id="dictPopup">
+  <div class="dict-popup-header">
+    <div id="dictWordHeader"></div>
+    <button class="dict-close-btn" onclick="closeDict()">✕</button>
+  </div>
+  <div id="dictContent"><div class="dict-loading">Buscando...</div></div>
 </div>
 
 <!-- Hidden file input -->
@@ -2568,6 +2894,9 @@ async function openBook(bookId) {
 
   APP.currentBook = book;
 
+  // Load annotations from cloud in background
+  loadAnnotationsFromCloud(book.id);
+
   einkFlash(() => {
     showScreen('screen-reader');
     hideReaderHeader(); // header always starts hidden — tap top to reveal
@@ -2759,6 +3088,12 @@ function renderPage(pageIndex) {
       }
     });
   }
+
+  // Apply saved highlights for this page
+  applyHighlightsToPage(pageIndex);
+
+  // Update bookmark button state
+  updateBookmarkButton();
 
   // Track reading time
   if (pageStartTime) {
@@ -3379,6 +3714,385 @@ self.addEventListener('fetch', e => {
   const blob = new Blob([swCode], { type: 'application/javascript' });
   const swUrl = URL.createObjectURL(blob);
   navigator.serviceWorker.register(swUrl).catch(() => {});
+}
+
+// ============================================================
+// ANNOTATIONS — HIGHLIGHTS, BOOKMARKS, DICTIONARY
+// ============================================================
+
+// ---- Storage ----
+let _annCache = {};
+
+function _annKey(bookId) {
+  const uid = APP.currentUser?.id || 'anon';
+  return `inkwell_ann_${uid}_${bookId}`;
+}
+
+function getAnnotationsForBook(bookId) {
+  const key = _annKey(bookId);
+  if (!_annCache[key]) {
+    try { _annCache[key] = JSON.parse(localStorage.getItem(key) || '[]'); }
+    catch(_) { _annCache[key] = []; }
+  }
+  return _annCache[key];
+}
+
+function _saveAnnotationsForBook(bookId, list) {
+  const key = _annKey(bookId);
+  _annCache[key] = list;
+  try { localStorage.setItem(key, JSON.stringify(list)); } catch(_) {}
+}
+
+async function addAnnotation(ann) {
+  const list = getAnnotationsForBook(ann.book_id);
+  list.push(ann);
+  _saveAnnotationsForBook(ann.book_id, list);
+  if (sb && APP.currentUser?.id && APP.currentUser.id !== 'anon') {
+    try { await sb.from('inkwell_annotations').upsert(ann); } catch(e) {}
+  }
+}
+
+async function removeAnnotation(id) {
+  const book = APP.currentBook;
+  if (!book) return;
+  const list = getAnnotationsForBook(book.id).filter(a => a.id !== id);
+  _saveAnnotationsForBook(book.id, list);
+  if (sb && APP.currentUser?.id && APP.currentUser.id !== 'anon') {
+    try { await sb.from('inkwell_annotations').delete().eq('id', id); } catch(e) {}
+  }
+}
+
+async function loadAnnotationsFromCloud(bookId) {
+  if (!sb || !APP.currentUser?.id || APP.currentUser.id === 'anon') return;
+  try {
+    const { data, error } = await sb.from('inkwell_annotations')
+      .select('*').eq('user_id', APP.currentUser.id).eq('book_id', bookId);
+    if (error || !data?.length) return;
+    const local = getAnnotationsForBook(bookId);
+    const localIds = new Set(local.map(a => a.id));
+    const merged = [...local, ...data.filter(a => !localIds.has(a.id))];
+    _saveAnnotationsForBook(bookId, merged);
+  } catch(e) {}
+}
+
+// ---- Highlight rendering ----
+function applyHighlightsToPage(pageIndex) {
+  const book = APP.currentBook;
+  if (!book) return;
+  const highlights = getAnnotationsForBook(book.id)
+    .filter(a => a.type === 'highlight' && a.page_index === pageIndex);
+  if (!highlights.length) return;
+  const pc = document.getElementById('pageContent');
+  highlights.forEach(h => _wrapTextInElement(pc, h.selected_text, h.id, h.comment || ''));
+}
+
+function _wrapTextInElement(container, text, id, comment) {
+  if (!text || !text.trim()) return;
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    const idx = node.textContent.indexOf(text);
+    if (idx < 0) continue;
+    const parent = node.parentNode;
+    if (!parent || parent.classList?.contains('inkwell-highlight')) continue;
+    const before = document.createTextNode(node.textContent.slice(0, idx));
+    const span = document.createElement('span');
+    span.className = 'inkwell-highlight';
+    span.textContent = text;
+    span.dataset.id = id;
+    if (comment) span.dataset.comment = comment;
+    span.title = comment || '';
+    span.onclick = (e) => { e.stopPropagation(); _showHighlightMenu(id); };
+    const after = document.createTextNode(node.textContent.slice(idx + text.length));
+    parent.insertBefore(before, node);
+    parent.insertBefore(span, node);
+    parent.insertBefore(after, node);
+    parent.removeChild(node);
+    return; // only first occurrence per highlight
+  }
+}
+
+function _showHighlightMenu(id) {
+  const book = APP.currentBook;
+  if (!book) return;
+  const ann = getAnnotationsForBook(book.id).find(a => a.id === id);
+  if (!ann) return;
+  const preview = (ann.selected_text || '').slice(0, 50);
+  confirm2(
+    'Destaque',
+    `"${preview}${ann.selected_text?.length > 50 ? '…' : ''}"${ann.comment ? '\n↳ ' + ann.comment : ''}\n\nRemover este destaque?`,
+    () => removeAnnotation(id).then(() => renderPage(APP.currentBook.currentPage))
+  );
+}
+
+// ---- Text selection toolbar ----
+let _selData = null;
+
+document.addEventListener('mouseup', _handleSelectionUp);
+document.addEventListener('touchend', (e) => setTimeout(_handleSelectionUp, 120));
+
+function _handleSelectionUp(e) {
+  // Don't trigger inside overlays/toolbars
+  if (e?.target?.closest('#selectionToolbar,#commentDialog,#dictPopup,.notes-overlay,.settings-overlay,.toc-overlay,.admin-overlay')) return;
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+    _hideSelectionToolbar();
+    return;
+  }
+  const text = sel.toString().trim();
+  if (text.length < 2) { _hideSelectionToolbar(); return; }
+  if (!document.activeElement?.closest('#pageContent') && !sel.focusNode?.parentElement?.closest('#pageContent')) {
+    _hideSelectionToolbar(); return;
+  }
+  const range = sel.getRangeAt(0);
+  const rect = range.getBoundingClientRect();
+  _selData = { text };
+  // Show/hide dict button for single word
+  const wordCount = text.trim().split(/\s+/).length;
+  document.getElementById('dictBtn').style.display = wordCount <= 3 ? '' : 'none';
+  _showSelectionToolbar(rect);
+}
+
+function _showSelectionToolbar(rect) {
+  const tb = document.getElementById('selectionToolbar');
+  tb.classList.add('show');
+  requestAnimationFrame(() => {
+    const tw = tb.offsetWidth || 180;
+    const th = tb.offsetHeight || 34;
+    let top = rect.top - th - 10;
+    let left = rect.left + rect.width / 2 - tw / 2;
+    if (top < 8) top = rect.bottom + 10;
+    left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+    tb.style.top = top + 'px';
+    tb.style.left = left + 'px';
+  });
+}
+
+function _hideSelectionToolbar() {
+  document.getElementById('selectionToolbar').classList.remove('show');
+  _selData = null;
+}
+
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('#selectionToolbar,#commentDialog,#dictPopup')) {
+    _hideSelectionToolbar();
+  }
+});
+
+// ---- Create highlight ----
+async function createHighlightFromSelection(comment) {
+  if (!_selData || !APP.currentBook) return;
+  const ann = {
+    id: 'hl_' + Date.now() + '_' + Math.random().toString(36).substr(2,5),
+    user_id: APP.currentUser?.id || 'anon',
+    book_id: APP.currentBook.id,
+    type: 'highlight',
+    page_index: APP.currentBook.currentPage,
+    selected_text: _selData.text,
+    comment: comment || '',
+    created_at: new Date().toISOString()
+  };
+  _hideSelectionToolbar();
+  window.getSelection()?.removeAllRanges();
+  await addAnnotation(ann);
+  const pc = document.getElementById('pageContent');
+  _wrapTextInElement(pc, ann.selected_text, ann.id, ann.comment);
+  showNotification('Destaque salvo');
+}
+
+// ---- Comment dialog (shared for highlights & bookmarks) ----
+function openCommentDialog() {
+  if (!_selData) return;
+  document.getElementById('commentDialogTitle').textContent = 'Adicionar comentário';
+  document.getElementById('commentSelectedText').textContent = _selData.text;
+  document.getElementById('commentTextarea').value = '';
+  document.getElementById('commentDialogMode').value = 'highlight';
+  document.getElementById('commentDialog').classList.add('open');
+  setTimeout(() => document.getElementById('commentTextarea').focus(), 50);
+  _hideSelectionToolbar();
+}
+
+function openBookmarkDialog() {
+  const page = (APP.currentBook?.currentPage || 0) + 1;
+  document.getElementById('commentDialogTitle').textContent = 'Marcar página ' + page;
+  document.getElementById('commentSelectedText').textContent = APP.currentBook?.title || '';
+  document.getElementById('commentTextarea').value = '';
+  document.getElementById('commentDialogMode').value = 'bookmark';
+  document.getElementById('commentDialog').classList.add('open');
+  setTimeout(() => document.getElementById('commentTextarea').focus(), 50);
+}
+
+async function saveComment() {
+  const comment = document.getElementById('commentTextarea').value.trim();
+  const mode = document.getElementById('commentDialogMode').value;
+  document.getElementById('commentDialog').classList.remove('open');
+  if (mode === 'bookmark') {
+    await _createBookmark(comment);
+  } else {
+    await createHighlightFromSelection(comment);
+  }
+}
+
+function closeCommentDialog() {
+  document.getElementById('commentDialog').classList.remove('open');
+  _selData = null;
+}
+
+// Close dialog on backdrop click
+document.getElementById('commentDialog').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('commentDialog')) closeCommentDialog();
+});
+
+// ---- Bookmarks ----
+function _isCurrentPageBookmarked() {
+  if (!APP.currentBook) return false;
+  return getAnnotationsForBook(APP.currentBook.id)
+    .some(a => a.type === 'bookmark' && a.page_index === APP.currentBook.currentPage);
+}
+
+function updateBookmarkButton() {
+  const btn = document.getElementById('btnBookmark');
+  if (!btn) return;
+  const bm = _isCurrentPageBookmarked();
+  btn.textContent = bm ? '◆' : '◇';
+  btn.title = bm ? 'Remover marcador' : 'Marcar página';
+}
+
+async function toggleBookmark() {
+  if (!APP.currentBook) return;
+  if (_isCurrentPageBookmarked()) {
+    const ann = getAnnotationsForBook(APP.currentBook.id)
+      .find(a => a.type === 'bookmark' && a.page_index === APP.currentBook.currentPage);
+    if (ann) { await removeAnnotation(ann.id); updateBookmarkButton(); showNotification('Marcador removido'); }
+  } else {
+    openBookmarkDialog();
+  }
+}
+
+async function _createBookmark(comment) {
+  if (!APP.currentBook) return;
+  const ann = {
+    id: 'bm_' + Date.now() + '_' + Math.random().toString(36).substr(2,5),
+    user_id: APP.currentUser?.id || 'anon',
+    book_id: APP.currentBook.id,
+    type: 'bookmark',
+    page_index: APP.currentBook.currentPage,
+    selected_text: null,
+    comment: comment || '',
+    created_at: new Date().toISOString()
+  };
+  await addAnnotation(ann);
+  updateBookmarkButton();
+  showNotification('Página marcada');
+}
+
+// ---- Notes panel ----
+let _notesTab = 'highlights';
+
+function openNotes() {
+  if (!APP.currentBook) return;
+  document.getElementById('notesOverlay').classList.add('open');
+  _renderNotesTab();
+}
+
+function closeNotes() {
+  document.getElementById('notesOverlay').classList.remove('open');
+}
+
+function switchNotesTab(tab) {
+  _notesTab = tab;
+  document.querySelectorAll('.notes-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.tab === tab));
+  _renderNotesTab();
+}
+
+function _renderNotesTab() {
+  const book = APP.currentBook;
+  if (!book) return;
+  const type = _notesTab === 'highlights' ? 'highlight' : 'bookmark';
+  const list = getAnnotationsForBook(book.id)
+    .filter(a => a.type === type)
+    .sort((a, b) => a.page_index - b.page_index);
+  const container = document.getElementById('notesBody');
+  if (!list.length) {
+    container.innerHTML = `<div style="padding:24px 0;font-size:10px;color:var(--ink-faint);letter-spacing:0.05em">${type === 'highlight' ? 'Nenhum destaque ainda. Selecione um trecho do livro para destacar.' : 'Nenhum marcador ainda. Clique em ◇ no header para marcar uma página.'}</div>`;
+    return;
+  }
+  container.innerHTML = list.map(a => `
+    <div class="note-item">
+      <div class="note-page">Página ${a.page_index + 1}</div>
+      ${a.selected_text ? `<div class="note-text" onclick="goToAnnotation(${a.page_index})">${_escHtml(a.selected_text.slice(0,150))}${a.selected_text.length>150?'…':''}</div>` : `<div class="note-text" onclick="goToAnnotation(${a.page_index})">→ Ir para página ${a.page_index+1}</div>`}
+      ${a.comment ? `<div class="note-comment">↳ ${_escHtml(a.comment)}</div>` : ''}
+      <button class="note-del-btn" onclick="_deleteAnnotationUI('${a.id}')">✕ Remover</button>
+    </div>
+  `).join('');
+}
+
+function _escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function goToAnnotation(pageIndex) {
+  closeNotes();
+  if (!APP.currentBook) return;
+  APP.currentBook.currentPage = pageIndex;
+  einkFlash(() => { renderPage(pageIndex); updateReaderFooter(); });
+  saveBookToDB(APP.currentBook);
+}
+
+async function _deleteAnnotationUI(id) {
+  await removeAnnotation(id);
+  _renderNotesTab();
+  showNotification('Removido');
+}
+
+// ---- Dictionary ----
+const _dictCache = {};
+
+async function lookupWord() {
+  if (!_selData) return;
+  const raw = _selData.text.trim().split(/\s+/)[0];
+  const word = raw.replace(/[^a-záéíóúàâêîôûãõüçA-ZÁÉÍÓÚÀÂÊÎÔÛÃÕÜÇ]/g, '').toLowerCase();
+  if (!word) return;
+  _hideSelectionToolbar();
+  const popup = document.getElementById('dictPopup');
+  document.getElementById('dictWordHeader').innerHTML = '';
+  document.getElementById('dictContent').innerHTML = `<div class="dict-loading">Buscando "${word}"…</div>`;
+  popup.classList.add('show');
+  if (_dictCache[word]) { _renderDictResult(_dictCache[word], word); return; }
+  let result = await _fetchDict(word, 'pt');
+  if (!result) result = await _fetchDict(word, 'en');
+  if (result) { _dictCache[word] = result; _renderDictResult(result, word); }
+  else { document.getElementById('dictContent').innerHTML = `<div class="dict-loading">Definição não encontrada para "<strong>${word}</strong>".</div>`; }
+}
+
+async function _fetchDict(word, lang) {
+  try {
+    const r = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/${lang}/${encodeURIComponent(word)}`);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return Array.isArray(d) && d.length ? d[0] : null;
+  } catch(_) { return null; }
+}
+
+function _renderDictResult(entry, word) {
+  const phonetic = entry.phonetics?.find(p => p.text)?.text || '';
+  const lang = entry.sourceUrls?.[0]?.includes('wiktionary') ? '' : '';
+  document.getElementById('dictWordHeader').innerHTML =
+    `<div><div class="dict-word">${entry.word || word}</div>${phonetic ? `<div class="dict-phonetic">${phonetic}</div>` : ''}</div>`;
+  let html = '';
+  (entry.meanings || []).slice(0, 3).forEach(m => {
+    html += `<div class="dict-pos">${m.partOfSpeech || ''}</div>`;
+    (m.definitions || []).slice(0, 2).forEach(d => {
+      html += `<div class="dict-def">${d.definition}</div>`;
+      if (d.example) html += `<div class="dict-example">"${d.example}"</div>`;
+    });
+  });
+  document.getElementById('dictContent').innerHTML = html || `<div class="dict-loading">Sem definições disponíveis.</div>`;
+}
+
+function closeDict() {
+  document.getElementById('dictPopup').classList.remove('show');
 }
 
 // ============================================================
