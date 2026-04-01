@@ -593,15 +593,15 @@ body::before {
 .touch-zone {
   position: absolute;
   z-index: 100;
-  cursor: pointer;
+  /* pointer-events: none — taps handled by pagesContainer click listener */
+  pointer-events: none;
 }
 
 /* Top strip — shows/hides the header */
 .touch-zone-top {
   top: 0; left: 0; right: 0;
   height: 15%;
-  z-index: 101; /* above left/right zones */
-  cursor: default;
+  z-index: 101;
 }
 
 /* Left/right nav zones start below the top strip */
@@ -1603,9 +1603,9 @@ input[type="file"] { display: none; }
       </div>
 
       <!-- Touch zones -->
-      <div class="touch-zone touch-zone-top" onclick="toggleReaderUI()"></div>
-      <div class="touch-zone touch-zone-left" onclick="prevPage()"></div>
-      <div class="touch-zone touch-zone-right" onclick="nextPage()"></div>
+      <div class="touch-zone touch-zone-top"></div>
+      <div class="touch-zone touch-zone-left"></div>
+      <div class="touch-zone touch-zone-right"></div>
     </div>
 
     <div class="reader-footer" id="readerFooter">
@@ -3660,6 +3660,43 @@ document.addEventListener('keydown', e => {
     } else if (e.key === 'Escape') {
       closeReader();
     }
+  }
+});
+
+// ============================================================
+// TAP NAVIGATION (replaces onclick on touch zones)
+// Touch zones have pointer-events:none so text can be selected freely.
+// All taps are caught here and dispatched by position.
+// ============================================================
+let _tapHadSelection = false; // true if user was clearing a selection
+
+document.getElementById('pagesContainer').addEventListener('mousedown', () => {
+  const sel = window.getSelection();
+  _tapHadSelection = !!(sel && !sel.isCollapsed && sel.toString().trim().length > 1);
+});
+
+document.getElementById('pagesContainer').addEventListener('click', (e) => {
+  // Ignore if this click is dismissing a text selection
+  if (_tapHadSelection) { _tapHadSelection = false; return; }
+  // Ignore if a fresh selection was just made
+  const sel = window.getSelection();
+  if (sel && !sel.isCollapsed && sel.toString().trim().length > 1) return;
+  // Ignore interactive elements
+  if (e.target.closest('button, a, .inkwell-highlight, #selectionToolbar')) return;
+
+  const x = e.clientX;
+  const y = e.clientY;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  if (y < h * 0.15) {
+    toggleReaderUI();       // top strip → toggle header
+  } else if (x < w * 0.25) {
+    prevPage();             // left quarter → previous page
+  } else if (x > w * 0.75) {
+    nextPage();             // right quarter → next page
+  } else {
+    toggleReaderUI();       // centre → toggle header
   }
 });
 
